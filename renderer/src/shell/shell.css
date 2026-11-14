@@ -24,36 +24,13 @@
 }
 
 .shell-page h1 {
-  margin: 18px 0 0;
+  margin: 0;
   font-size: var(--size-title);
   font-weight: var(--weight-title);
   line-height: 1.25;
 }
 
-.shell-status {
-  margin: 14px 0 0;
-  color: var(--ink-muted);
-  font-size: var(--size-aux);
-}
-
-.shell-serif {
+.shell-page p {
   max-width: var(--measure-essay);
-  font-family: var(--font-serif);
-  font-size: var(--size-body);
-}
-
-.shell-sans,
-.shell-mono {
-  max-width: var(--measure-essay);
-}
-
-.shell-mono {
-  font-family: var(--font-mono);
-}
-
-.shell-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 36px;
+  margin: 18px 0 0;
 }

@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { CommandName, CommandResult, EventName, KeepNoteBridge, QueryName } from '../shared'
+import type { CommandName, EventName, KeepNoteBridge, QueryName } from '../shared'
 
 const bridge: KeepNoteBridge = {
-  run(command: CommandName): Promise<CommandResult> {
+  run(command: CommandName) {
     return ipcRenderer.invoke('keepnote:run', command)
   },
-  query(name: QueryName): Promise<CommandResult> {
+  query(name: QueryName) {
     return ipcRenderer.invoke('keepnote:query', name)
   },
   subscribe(event: EventName, listener: () => void): () => void {

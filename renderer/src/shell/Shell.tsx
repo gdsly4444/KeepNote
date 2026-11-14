@@ -1,39 +1,40 @@
 import { useEffect, useState } from 'react'
 import { getKeepNote } from '../client'
+import { LibraryView, loadLibrary, openLibrary } from '../library'
+import type { LibraryStatus } from '../../../shared'
 import './shell.css'
 
-type BridgeState = 'pending' | 'ready' | 'failed'
-
 export function Shell() {
-  const [bridge, setBridge] = useState<BridgeState>('pending')
+  const [status, setStatus] = useState<LibraryStatus>({ state: 'closed' })
 
   useEffect(() => {
     const keepNote = getKeepNote()
     if (!keepNote) {
-      setBridge('failed')
+      setStatus({ state: 'failed', message: '逻辑进程没有接通' })
       return
     }
     let cancelled = false
-    const unsubscribe = keepNote.subscribe('ready', () => {
-      if (!cancelled) setBridge('ready')
+    const apply = (next: LibraryStatus): void => {
+      if (!cancelled) setStatus(next)
+    }
+    void loadLibrary(keepNote).then(apply, () => apply({ state: 'failed', message: '库没有读成' }))
+    const unsubscribe = keepNote.subscribe('library-changed', () => {
+      void loadLibrary(keepNote).then(apply, () => apply({ state: 'failed', message: '库没有读成' }))
     })
-    void keepNote.run('ping').then(
-      (result) => {
-        if (cancelled) return
-        setBridge(result.ok ? 'ready' : 'failed')
-      },
-      () => {
-        if (!cancelled) setBridge('failed')
-      }
-    )
     return () => {
       cancelled = true
       unsubscribe()
     }
   }, [])
 
-  const status =
-    bridge === 'ready' ? '逻辑进程已接通' : bridge === 'failed' ? '逻辑进程没有接通' : '正在接通逻辑进程'
+  const open = (): void => {
+    const keepNote = getKeepNote()
+    if (!keepNote) {
+      setStatus({ state: 'failed', message: '逻辑进程没有接通' })
+      return
+    }
+    void openLibrary(keepNote).then(setStatus, () => setStatus({ state: 'failed', message: '库没有读成' }))
+  }
 
   return (
     <div className="shell">
@@ -41,24 +42,7 @@ export function Shell() {
         <p className="shell-kicker">KeepNote</p>
       </aside>
       <main className="shell-page motion-displace">
-        <p className="shell-kicker">KeepNote</p>
-        <h1>进程骨架</h1>
-        <p className="shell-status">{status}</p>
-        <p className="shell-serif density-essay">中文与 Latin 排在同一行，Ag 12。</p>
-        <p className="shell-serif density-journal">日记稍紧一些，条目仍是句子。</p>
-        <p className="shell-sans density-note">界面用无衬线。Notes and 笔记。</p>
-        <p className="shell-mono density-list">14:02 git status</p>
-        <div className="shell-actions">
-          <button className="control" type="button">
-            当前项
-          </button>
-          <button className="control" type="button" disabled>
-            禁用
-          </button>
-          <button className="text-link" type="button">
-            链接
-          </button>
-        </div>
+        <LibraryView status={status} onOpen={open} />
       </main>
     </div>
   )

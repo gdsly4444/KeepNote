@@ -1,14 +1,21 @@
-import { app, BrowserWindow, ipcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
-import type { CommandName, CommandResult, QueryName } from '../shared'
+import type { BridgeResult, CommandName, LibraryStatus, QueryName } from '../shared'
+import { parseMarkdown } from './documents'
+import { createLibrarySession, type LibrarySession } from './library'
 import { quitsWhenLastWindowCloses } from './platform'
+import { createNodeVault } from './vault'
 
-const unknownCommand: CommandResult = { ok: false, code: 'unknown-command', message: '未知命令' }
+const unknownCommand: BridgeResult<null> = { ok: false, code: 'unknown-command', message: '未知命令' }
 
 let mainWindow: BrowserWindow | null = null
 
 export function startApp(): void {
-  registerBridge()
+  const session = createLibrarySession(createNodeVault(), parseMarkdown)
+  registerBridge(session)
+  app.on('before-quit', () => {
+    session.close()
+  })
 
   app.on('second-instance', () => {
     if (app.isReady()) revealWindow()
@@ -84,22 +91,48 @@ function createWindow(): BrowserWindow {
   return window
 }
 
-function registerBridge(): void {
+function registerBridge(session: LibrarySession): void {
   ipcMain.handle('keepnote:run', (event, command: CommandName) => {
-    return runCommand(event.sender, command)
+    return runCommand(event.sender, command, session)
   })
   ipcMain.handle('keepnote:query', (_event, name: QueryName) => {
-    return runQuery(name)
+    return runQuery(name, session)
+  })
+  session.subscribe(() => {
+    const contents = mainWindow?.webContents
+    if (!contents || contents.isDestroyed()) return
+    contents.send('keepnote:event:library-changed')
   })
 }
 
-function runCommand(sender: WebContents, command: CommandName): CommandResult {
-  if (command !== 'ping') return unknownCommand
-  sender.send('keepnote:event:ready')
-  return { ok: true }
+async function runCommand(
+  sender: WebContents,
+  command: CommandName,
+  session: LibrarySession
+): Promise<BridgeResult<null>> {
+  if (command === 'ping') {
+    sender.send('keepnote:event:ready')
+    return { ok: true, value: null }
+  }
+  if (command === 'open-library') return session.open(await chooseDirectory())
+  return unknownCommand
 }
 
-function runQuery(name: QueryName): CommandResult {
-  if (name !== 'ping') return unknownCommand
-  return { ok: true }
+async function runQuery(
+  name: QueryName,
+  session: LibrarySession
+): Promise<BridgeResult<LibraryStatus | null>> {
+  if (name === 'ping') return { ok: true, value: null }
+  if (name === 'library') return { ok: true, value: await session.current() }
+  return unknownCommand
+}
+
+async function chooseDirectory(): Promise<string | null> {
+  const options = { title: '选择库', properties: ['openDirectory' as const] }
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options)
+  if (result.canceled || !result.filePaths[0]) return null
+  return result.filePaths[0]
 }
