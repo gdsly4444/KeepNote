@@ -34,6 +34,14 @@ describe('createNodeVault', () => {
     expect(await vault.listFiles(root)).toHaveLength(3)
   })
 
+  it('creates the parent directories of a new note and still refuses a path outside the vault', async () => {
+    const root = await makeRoot()
+    const vault = createNodeVault()
+    await vault.writeMarkdown(root, 'work/2026/11/2026-11-14.md', '# 2026-11-14\r\n')
+    expect(await vault.readMarkdown(root, 'work/2026/11/2026-11-14.md')).toBe('# 2026-11-14\n')
+    await expect(vault.writeMarkdown(root, '../outside.md', 'x')).rejects.toThrow('读不到 ../outside.md')
+  })
+
   it('lists a symlink and does not follow one that leaves the vault', async () => {
     const root = await makeRoot()
     const outside = await makeRoot()

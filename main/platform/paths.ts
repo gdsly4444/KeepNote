@@ -34,3 +34,28 @@ export function contractPath(root: string, absolute: string): string {
 export function joinPath(...parts: string[]): string {
   return path.join(...parts)
 }
+
+export function parentPath(value: string): string {
+  return path.dirname(value)
+}
+
+export function baseName(value: string): string {
+  return path.posix.basename(value)
+}
+
+export function portablePath(...parts: string[]): string {
+  if (parts.length === 0) throw new Error('路径片段无效')
+  for (const part of parts) {
+    if (
+      part.length === 0 ||
+      part === '.' ||
+      part === '..' ||
+      part.includes('/') ||
+      part.includes('\\') ||
+      part.includes('\0')
+    ) {
+      throw new Error('路径片段无效')
+    }
+  }
+  return path.posix.join(...parts)
+}

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
-import type { BridgeResult, CommandName, LibraryStatus, QueryName } from '../shared'
+import type { BridgeResult, CommandArgs, CommandName, CommandSuccess, LibraryStatus, QueryName } from '../shared'
+import { createCommandRegistry, systemClock, type CommandRegistry } from './commands'
 import { parseMarkdown } from './documents'
 import { createLibrarySession, type LibrarySession } from './library'
 import { quitsWhenLastWindowCloses } from './platform'
@@ -11,8 +12,15 @@ const unknownCommand: BridgeResult<null> = { ok: false, code: 'unknown-command',
 let mainWindow: BrowserWindow | null = null
 
 export function startApp(): void {
-  const session = createLibrarySession(createNodeVault(), parseMarkdown)
-  registerBridge(session)
+  const vault = createNodeVault()
+  const session = createLibrarySession(vault, parseMarkdown)
+  const commands = createCommandRegistry({
+    notes: vault,
+    parse: parseMarkdown,
+    root: () => session.location(),
+    clock: systemClock()
+  })
+  registerBridge(session, commands)
   app.on('before-quit', () => {
     session.close()
   })
@@ -91,9 +99,9 @@ function createWindow(): BrowserWindow {
   return window
 }
 
-function registerBridge(session: LibrarySession): void {
-  ipcMain.handle('keepnote:run', (event, command: CommandName) => {
-    return runCommand(event.sender, command, session)
+function registerBridge(session: LibrarySession, commands: CommandRegistry): void {
+  ipcMain.handle('keepnote:run', (event, command: CommandName, args?: CommandArgs) => {
+    return runCommand(event.sender, command, args, session, commands)
   })
   ipcMain.handle('keepnote:query', (_event, name: QueryName) => {
     return runQuery(name, session)
@@ -108,14 +116,16 @@ function registerBridge(session: LibrarySession): void {
 async function runCommand(
   sender: WebContents,
   command: CommandName,
-  session: LibrarySession
-): Promise<BridgeResult<null>> {
+  args: CommandArgs | undefined,
+  session: LibrarySession,
+  commands: CommandRegistry
+): Promise<BridgeResult<CommandSuccess | null>> {
   if (command === 'ping') {
     sender.send('keepnote:event:ready')
     return { ok: true, value: null }
   }
   if (command === 'open-library') return session.open(await chooseDirectory())
-  return unknownCommand
+  return commands.execute(command, args)
 }
 
 async function runQuery(

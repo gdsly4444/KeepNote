@@ -1,7 +1,7 @@
 import { watch } from 'node:fs'
 import type { Dirent } from 'node:fs'
-import { open, readdir, readFile, realpath, rename, rm } from 'node:fs/promises'
-import { contractPath, joinPath, normalizeNewlines, resolveInside } from '../platform'
+import { mkdir, open, readdir, readFile, realpath, rename, rm } from 'node:fs/promises'
+import { contractPath, joinPath, normalizeNewlines, parentPath, resolveInside } from '../platform'
 import { writeAtomic, type AtomicIO } from './atomic'
 import { isMarkdownName, isTemporaryName, type ListedFile, type VaultStore } from './types'
 
@@ -88,6 +88,7 @@ async function readMarkdown(root: string, relativePath: string): Promise<string>
 async function writeMarkdown(root: string, relativePath: string, text: string): Promise<void> {
   const absolute = markdownInside(root, relativePath)
   try {
+    await mkdir(parentPath(absolute), { recursive: true })
     await writeAtomic(absolute, text, nodeIO)
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('读不到')) throw error

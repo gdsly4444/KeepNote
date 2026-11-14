@@ -5,6 +5,7 @@ export type ParseMarkdown = (file: { path: string; name: string }, source: strin
 
 export interface LibrarySession {
   current(): Promise<LibraryStatus>
+  location(): string | null
   open(root: string | null): Promise<BridgeResult<null>>
   subscribe(listener: () => void): () => void
   close(): void
@@ -21,6 +22,9 @@ export function createLibrarySession(directory: VaultDirectory, parse: ParseMark
   }
 
   return {
+    location() {
+      return root
+    },
     async current() {
       if (!root) return { state: 'closed' }
       if (failure) return { state: 'failed', message: failure }

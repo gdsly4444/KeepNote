@@ -1,6 +1,8 @@
 export type {
   BridgeResult,
+  CommandArgs,
   CommandName,
+  CommandSuccess,
   EventName,
   KeepNoteBridge,
   QueryName

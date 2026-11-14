@@ -1,6 +1,6 @@
 import { posix, win32 } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { contractPathWith, resolveInsideWith, samePath } from './paths'
+import { baseName, contractPathWith, joinPath, parentPath, portablePath, resolveInsideWith, samePath } from './paths'
 
 describe('samePath', () => {
   it('treats separators and case as the same path', () => {
@@ -21,6 +21,22 @@ describe('resolveInside', () => {
     expect(resolveInsideWith('C:\\vault', '..\\secret.md', win32)).toBeNull()
     expect(resolveInsideWith('/vault', '/etc/passwd', posix)).toBeNull()
     expect(resolveInsideWith('C:\\vault', 'D:\\secret.md', win32)).toBeNull()
+  })
+})
+
+describe('portable paths', () => {
+  it('joins vault segments with the contract separator', () => {
+    expect(portablePath('work', '2026', '11', '2026-11-14.md')).toBe('work/2026/11/2026-11-14.md')
+  })
+
+  it('rejects a segment that is already a path', () => {
+    expect(() => portablePath('work', '../2026')).toThrow('路径片段无效')
+    expect(() => portablePath('work/2026')).toThrow('路径片段无效')
+  })
+
+  it('names the last segment and the parent directory', () => {
+    expect(baseName('work/2026/11/2026-11-14.md')).toBe('2026-11-14.md')
+    expect(parentPath(joinPath('/vault', 'work', '2026'))).toBe(joinPath('/vault', 'work'))
   })
 })
 
