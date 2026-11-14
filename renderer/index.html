@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KeepNote</title>
+    <script>
+      const dark = matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+    </script>
+    <link rel="preload" href="/src/tokens/fonts/sans-regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/tokens/fonts/sans-medium.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/tokens/fonts/sans-bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/tokens/fonts/serif-regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/tokens/fonts/mono-regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/src/tokens/tokens.css" />
   </head>
   <body>
     <div id="root"></div>

@@ -1,0 +1,55 @@
+@font-face {
+  font-family: "KeepNote Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/sans-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("./fonts/sans-medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("./fonts/sans-bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/serif-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Serif";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("./fonts/serif-bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/mono-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "KeepNote Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("./fonts/mono-bold.woff2") format("woff2");
+}

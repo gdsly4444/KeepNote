@@ -1,0 +1,59 @@
+.shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.shell-side {
+  background: var(--sidebar);
+  padding: 28px 24px;
+}
+
+.shell-kicker {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+  font-weight: var(--weight-control);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-page {
+  box-sizing: border-box;
+  padding: 72px 80px 96px;
+}
+
+.shell-page h1 {
+  margin: 18px 0 0;
+  font-size: var(--size-title);
+  font-weight: var(--weight-title);
+  line-height: 1.25;
+}
+
+.shell-status {
+  margin: 14px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+}
+
+.shell-serif {
+  max-width: var(--measure-essay);
+  font-family: var(--font-serif);
+  font-size: var(--size-body);
+}
+
+.shell-sans,
+.shell-mono {
+  max-width: var(--measure-essay);
+}
+
+.shell-mono {
+  font-family: var(--font-mono);
+}
+
+.shell-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 36px;
+}
