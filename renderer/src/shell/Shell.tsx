@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import type { CommandName, DeskView, DocumentType, KeepNoteBridge, LibraryStatus, MarkdownDocument } from '../../../shared'
+import type { ChangedView, CommandName, DeskView, DocumentType, KeepNoteBridge, LibraryStatus, MarkdownDocument } from '../../../shared'
 import { getKeepNote } from '../client'
 import { CommandLine } from '../commandline'
 import { EssayPage } from '../essay'
 import { JournalPage } from '../journal'
 import { LibraryView, loadLibrary, openLibrary } from '../library'
 import { ListPage } from '../list'
-import { ContextSide, NavSide, contextEmpty, contextItems, typeName, type ContextItem } from '../sidebar'
+import { ContextSide, NavSide, WorkContext, contextEmpty, contextItems, typeName, type ContextItem } from '../sidebar'
 import { TechPage, codeBlocks } from '../tech'
 import { WorkPage } from '../work'
 import { fitSides, sideWidth } from './layout'
@@ -39,6 +39,7 @@ export function Shell() {
   const [dragging, setDragging] = useState(false)
   const [deskName, setDeskName] = useState('库')
   const [scrollTo, setScrollTo] = useState<PageScroll | null>(null)
+  const [changed, setChanged] = useState<ChangedView>({ pending: [], accepted: [] })
   const commandRef = useRef<HTMLInputElement>(null)
   const nonce = useRef(0)
   const visit = useRef(0)
@@ -133,6 +134,19 @@ export function Shell() {
     if (current?.type === 'journal') commandRef.current?.focus()
   }, [current?.path, current?.type])
 
+  useEffect(() => {
+    const bridge = getKeepNote()
+    if (!bridge || status.state !== 'ready') return
+    let cancel = false
+    void bridge.query('changed').then((result) => {
+      if (cancel || !result.ok || !result.value || !('pending' in result.value)) return
+      setChanged(result.value)
+    })
+    return () => {
+      cancel = true
+    }
+  }, [status])
+
   const openFolder = (): void => {
     const keepNote = getKeepNote()
     if (!keepNote) {
@@ -168,6 +182,19 @@ export function Shell() {
     setSelected(result.value.path)
     setFocus(false)
     setCommandVisible(true)
+  }
+
+  async function acceptNote(path: string): Promise<void> {
+    const keepNote = getKeepNote()
+    if (!keepNote || !path) return
+    const result = await keepNote.run('accept', { path })
+    if (!result.ok) {
+      setNotice(result.message)
+      return
+    }
+    setNotice('')
+    const next = await keepNote.query('changed')
+    if (next.ok && next.value && 'pending' in next.value) setChanged(next.value)
   }
 
   async function show(path: string): Promise<void> {
@@ -346,7 +373,18 @@ export function Shell() {
       </main>
       <aside className="shell-context">
         <button className="shell-split shell-split-context" type="button" aria-label="拖动上下文" onPointerDown={(event) => beginDrag('context', event)} />
-        {current ? <ContextSide items={items} empty={contextEmpty(current.type)} onPick={pick} /> : <p className="side-empty">还没有打开笔记</p>}
+        {current?.type === 'work' ? (
+          <WorkContext
+            pending={changed.pending}
+            accepted={changed.accepted}
+            onAccept={(path) => void acceptNote(path)}
+            onOpen={(path) => void show(path)}
+          />
+        ) : current ? (
+          <ContextSide items={items} empty={contextEmpty(current.type)} onPick={pick} />
+        ) : (
+          <p className="side-empty">还没有打开笔记</p>
+        )}
       </aside>
       {bridge ? (
         <div className="shell-command">

@@ -1,3 +1,6 @@
+import { samePath } from '../platform'
+import type { ChangedNote, ChangedView } from '../../shared'
+
 export function workTemplate(day: string): string {
   return document('work', [`# ${day}`, '', '## 在做', '', '## 记录', '', '## 产出', '', '## 留下'])
 }
@@ -49,6 +52,37 @@ export function appendSection(text: string, heading: string, line: string): stri
     ...after,
     ...lines.slice(range.end)
   ])
+}
+
+export function outputTitles(source: string): string[] {
+  const lines = source.split('\n')
+  const range = sectionRange(lines, '产出')
+  if (!range) return []
+  const titles: string[] = []
+  for (const line of lines.slice(range.start + 1, range.end)) {
+    const match = /^- \[\[(.+)\]\]$/.exec(line.trim())
+    if (match?.[1]) titles.push(match[1])
+  }
+  return titles
+}
+
+export function classifyChanged(
+  changed: readonly ChangedNote[],
+  recorded: readonly string[],
+  workPath: string,
+  known: readonly ChangedNote[]
+): ChangedView {
+  const recordedTitles = new Set(recorded)
+  const pending = changed.filter((note) => !samePath(note.path, workPath) && !recordedTitles.has(note.title))
+  const accepted: ChangedNote[] = []
+  const seen = new Set<string>()
+  for (const title of recorded) {
+    if (seen.has(title)) continue
+    seen.add(title)
+    const found = known.find((note) => note.title === title)
+    accepted.push(found ? { path: found.path, title: found.title, type: found.type } : { path: '', title, type: 'essay' })
+  }
+  return { pending, accepted }
 }
 
 function document(type: string, body: readonly string[]): string {

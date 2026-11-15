@@ -1,5 +1,5 @@
-import { useState, type KeyboardEvent, type Ref } from 'react'
-import type { BridgeResult, CommandName, CommandSuccess, KeepNoteBridge } from '../../../shared'
+import { useEffect, useState, type KeyboardEvent, type Ref } from 'react'
+import type { BridgeResult, CommandName, CommandSuccess, CompletionItem, KeepNoteBridge, QueryValue } from '../../../shared'
 import './commandline.css'
 import { readCommandLine } from './read'
 
@@ -23,6 +23,27 @@ export function CommandLine({
   const [echo, setEcho] = useState('')
   const [history, setHistory] = useState<string[]>([])
   const [place, setPlace] = useState(-1)
+  const [items, setItems] = useState<CompletionItem[]>([])
+  const [active, setActive] = useState(-1)
+
+  useEffect(() => {
+    setActive(-1)
+    let cancel = false
+    if (!value.trim()) {
+      setItems([])
+      return () => {
+        cancel = true
+      }
+    }
+    void bridge.query('complete', { text: value }).then((result) => {
+      if (!cancel) setItems(completionItems(result.ok ? result.value : null))
+    }, () => {
+      if (!cancel) setItems([])
+    })
+    return () => {
+      cancel = true
+    }
+  }, [bridge, value])
 
   async function submit(line: string): Promise<void> {
     const read = readCommandLine(line)
@@ -33,17 +54,43 @@ export function CommandLine({
     const args = currentPath ? { ...read.args, currentPath } : read.args
     const result = await bridge.run(read.command, args)
     setEcho(result.ok ? (result.value?.message ?? '') : result.message)
-    setHistory((items) => [line, ...items.filter((item) => item !== line)])
+    setHistory((lines) => [line, ...lines.filter((item) => item !== line)])
     setPlace(-1)
     if (result.ok) onChange('')
     onResult(read.command, result)
   }
 
+  function choose(next: string): void {
+    setActive(-1)
+    onChange(next)
+  }
+
   function onKey(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.nativeEvent.isComposing) return
+    if (event.key === 'ArrowDown' && items.length > 0) {
+      event.preventDefault()
+      setActive((current) => (current + 1) % items.length)
+      return
+    }
+    if (event.key === 'Tab' && items.length > 0) {
+      event.preventDefault()
+      const chosen = items[active] ?? items[0]
+      if (chosen) choose(chosen.value)
+      return
+    }
     if (event.key === 'Enter') {
       event.preventDefault()
+      const chosen = active >= 0 ? items[active] : undefined
+      if (chosen) {
+        choose(chosen.value)
+        return
+      }
       void submit(value)
+      return
+    }
+    if (event.key === 'ArrowUp' && active >= 0) {
+      event.preventDefault()
+      setActive((current) => (current - 1 + items.length) % items.length)
       return
     }
     if (event.key === 'ArrowUp') {
@@ -59,7 +106,21 @@ export function CommandLine({
   return (
     <div className="command-bar">
       <div className="command-pop">
-        <ul className="command-complete" aria-label="补全" />
+        <ul className="command-complete" aria-label="补全">
+          {items.map((item, index) => (
+            <li key={`${item.kind}-${item.label}-${index}`}>
+              <button
+                className="command-choice"
+                type="button"
+                data-active={index === active ? 'true' : 'false'}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(item.value)}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
         {notice || echo ? (
           <p className="command-echo" role="status">
             {notice || echo}
@@ -81,4 +142,9 @@ export function CommandLine({
       </div>
     </div>
   )
+}
+
+function completionItems(value: QueryValue): CompletionItem[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item) => item.kind === 'command' || item.kind === 'type' || item.kind === 'note')
 }

@@ -1,7 +1,7 @@
 import type { BridgeResult, CommandArgs, CommandSuccess, DocumentType, MarkdownDocument } from '../../shared'
 import { baseName, normalizeNewlines, portablePath, samePath } from '../platform'
 import type { ListedFile } from '../vault'
-import { appendJournalEntry, appendSection, journalTemplate, noteTemplate, setSection, workTemplate } from './text'
+import { appendJournalEntry, appendSection, journalTemplate, noteTemplate, outputTitles, setSection, workTemplate } from './text'
 
 const documentTypes = ['work', 'essay', 'journal', 'list', 'tech'] as const
 
@@ -16,10 +16,16 @@ export interface NoteStore {
   writeMarkdown(root: string, relativePath: string, text: string): Promise<void>
 }
 
+export interface NoteLookup {
+  findByName(name: string): { path: string; title: string; type: DocumentType }[]
+  changedOn(day: string): { path: string; title: string; type: DocumentType }[]
+}
+
 export interface CommandTools {
   root: string
   clock: CommandClock
   notes: NoteStore
+  index: NoteLookup
   parse(file: { path: string; name: string }, source: string): MarkdownDocument
 }
 
@@ -39,6 +45,12 @@ export interface CommandDeps {
   parse: CommandTools['parse']
   root(): string | null
   clock: CommandClock
+  index?: NoteLookup
+}
+
+const emptyLookup: NoteLookup = {
+  findByName: () => [],
+  changedOn: () => []
 }
 
 export function systemClock(): CommandClock {
@@ -69,6 +81,7 @@ export function createCommandRegistry(deps: CommandDeps): CommandRegistry {
   register({ name: 'now', appliesTo: 'any', run: runNow })
   register({ name: 'leave', appliesTo: 'any', run: runLeave })
   register({ name: 'log', appliesTo: 'any', run: runLog })
+  register({ name: 'accept', appliesTo: 'any', run: runAccept })
 
   return {
     register,
@@ -77,7 +90,7 @@ export function createCommandRegistry(deps: CommandDeps): CommandRegistry {
       if (!command) return fail('unknown-command', '未知命令')
       const root = deps.root()
       if (!root) return fail('library-closed', '还没有打开库')
-      const tools: CommandTools = { root, clock: deps.clock, notes: deps.notes, parse: deps.parse }
+      const tools: CommandTools = { root, clock: deps.clock, notes: deps.notes, index: deps.index ?? emptyLookup, parse: deps.parse }
       try {
         const input = readArgs(args)
         if (command.appliesTo !== 'any') {
@@ -138,12 +151,33 @@ async function runNew(args: CommandArgs, tools: CommandTools): Promise<BridgeRes
 
 async function runOpen(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
   if (!args.path) return fail('missing-path', '缺少要打开的文档')
-  const note = await readNote(tools, args.path)
+  const note = await resolveNote(tools, args.path)
   if (!note.ok) return note
   return {
     ok: true,
     value: { path: note.value.path, title: note.value.title, created: false, message: `打开了「${note.value.title}」` }
   }
+}
+
+async function runAccept(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
+  if (!args.path) return fail('missing-path', '缺少要记入的文档')
+  const note = await resolveNote(tools, args.path)
+  if (!note.ok) return note
+  const day = tools.clock.today()
+  const destination = workPathFor(day)
+  if (samePath(note.value.path, destination)) return fail('not-output', '工作记录不记入产出')
+  const changed = tools.index.changedOn(day)
+  if (!changed.some((item) => samePath(item.path, note.value.path))) return fail('unchanged', '这篇今天没有改过')
+  const today = await loadDaily(tools, 'work', workTemplate(day))
+  if (!today.ok) return today
+  if (outputTitles(today.value.source).includes(note.value.title)) {
+    if (today.value.created) await tools.notes.writeMarkdown(tools.root, today.value.path, today.value.source)
+    return done(tools, today.value, '已经在产出里')
+  }
+  const next = appendSection(today.value.source, '产出', `- [[${note.value.title}]]`)
+  if (!next) return fail('missing-section', '这篇里没有「产出」')
+  await tools.notes.writeMarkdown(tools.root, today.value.path, next)
+  return done(tools, { ...today.value, source: next }, `记入了「${note.value.title}」`)
 }
 
 async function runSave(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
@@ -232,6 +266,10 @@ async function loadDaily(
   return { ok: true, value: { path: existing.path, source, created: false } }
 }
 
+export function workPathFor(day: string): string {
+  return dailyPath('work', day)
+}
+
 function dailyPath(folder: 'work' | 'journal', day: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
   const year = match?.[1]
@@ -245,6 +283,21 @@ async function findFile(tools: CommandTools, relativePath: string): Promise<List
   const matches = files.filter((file) => samePath(file.path, relativePath))
   if (matches.length > 1) return 'many'
   return matches[0] ?? null
+}
+
+async function resolveNote(
+  tools: CommandTools,
+  token: string
+): Promise<BridgeResult<{ path: string; source: string; title: string; type: DocumentType }>> {
+  const found = await findFile(tools, token)
+  if (found === 'many') return fail('ambiguous', '有多篇同名')
+  if (found?.markdown) return readNote(tools, found.path)
+  const named = tools.index.findByName(token)
+  if (named.length > 1) return fail('ambiguous', '有多篇同名')
+  const match = named[0]
+  if (match) return readNote(tools, match.path)
+  if (!found) return fail('not-found', '没有这篇')
+  return fail('not-markdown', '这不是笔记')
 }
 
 async function readNote(

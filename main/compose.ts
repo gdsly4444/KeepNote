@@ -1,12 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { BridgeResult, CommandArgs, CommandName, CommandSuccess, DeskView, QueryName } from '../shared'
-import { createCommandRegistry, systemClock, type CommandClock, type CommandRegistry } from './commands'
+import type { BridgeResult, ChangedView, CommandArgs, CommandName, CommandSuccess, DeskView, QueryArgs, QueryName } from '../shared'
+import { classifyChanged, completeLine, createCommandRegistry, outputTitles, systemClock, workPathFor, type CommandClock, type CommandRegistry } from './commands'
 import { parseMarkdown } from './documents'
+import { createNoteIndex, followLibrary, type NoteIndex } from './index/index'
 import { createDeskStore, createLibrarySession, type DeskStore, type LibrarySession } from './library'
 import { baseName, quitsWhenLastWindowCloses } from './platform'
-import { createNodeVault } from './vault'
+import { createNodeVault, type VaultStore } from './vault'
 
 const unknownCommand: BridgeResult<null> = { ok: false, code: 'unknown-command', message: '未知命令' }
 
@@ -29,14 +30,40 @@ export function startApp(): void {
       writeFileSync(path, text)
     }
   })
+  const indexFile = join(app.getPath('userData'), 'index.sqlite')
+  mkdirSync(dirname(indexFile), { recursive: true })
+  const noteIndex = createNoteIndex({
+    file: indexFile,
+    source: {
+      async list() {
+        const root = session.location()
+        if (!root) return []
+        return (await vault.listFiles(root))
+          .filter((file) => file.markdown)
+          .map((file) => ({ path: file.path, name: file.name, mtimeMs: file.modifiedMs }))
+      },
+      read(path) {
+        const root = session.location()
+        if (!root) return Promise.reject(new Error('还没有打开库'))
+        return vault.readMarkdown(root, path)
+      }
+    },
+    titles(file, source) {
+      const parsed = parseMarkdown(file, source)
+      return { title: parsed.title, type: parsed.type }
+    }
+  })
   const commands = createCommandRegistry({
     notes: vault,
     parse: parseMarkdown,
     root: () => session.location(),
-    clock
+    clock,
+    index: noteIndex
   })
-  registerBridge(session, commands, desk, clock)
+  followLibrary(session, noteIndex)
+  registerBridge(session, commands, desk, clock, noteIndex, vault)
   app.on('before-quit', () => {
+    noteIndex.close()
     session.close()
   })
 
@@ -55,6 +82,7 @@ export function startApp(): void {
   void app.whenReady().then(async () => {
     const saved = desk.read()
     if (saved.root) await session.open(saved.root)
+    await noteIndex.refresh()
     createWindow()
   })
 }
@@ -120,13 +148,15 @@ function registerBridge(
   session: LibrarySession,
   commands: CommandRegistry,
   desk: DeskStore,
-  clock: CommandClock
+  clock: CommandClock,
+  noteIndex: NoteIndex,
+  vault: VaultStore
 ): void {
   ipcMain.handle('keepnote:run', (event, command: CommandName, args?: CommandArgs) => {
     return runCommand(event.sender, command, args, session, commands, desk, clock)
   })
-  ipcMain.handle('keepnote:query', (_event, name: QueryName) => {
-    return runQuery(name, session, desk, clock)
+  ipcMain.handle('keepnote:query', (_event, name: QueryName, args?: QueryArgs) => {
+    return runQuery(name, args, session, desk, clock, noteIndex, vault)
   })
   session.subscribe(() => {
     const contents = mainWindow?.webContents
@@ -166,10 +196,13 @@ async function runCommand(
 
 async function runQuery(
   name: QueryName,
+  args: QueryArgs | undefined,
   session: LibrarySession,
   desk: DeskStore,
-  clock: CommandClock
-): Promise<BridgeResult<DeskView | Awaited<ReturnType<LibrarySession['current']>> | null>> {
+  clock: CommandClock,
+  noteIndex: NoteIndex,
+  vault: VaultStore
+): Promise<BridgeResult<DeskView | ChangedView | Awaited<ReturnType<LibrarySession['current']>> | ReturnType<typeof completeLine> | null>> {
   if (name === 'ping') return { ok: true, value: null }
   if (name === 'library') return { ok: true, value: await session.current() }
   if (name === 'desk') {
@@ -177,7 +210,29 @@ async function runQuery(
     const root = session.location()
     return { ok: true, value: { today: clock.today(), day: saved.day, name: root ? baseName(root) : '', path: saved.path } }
   }
+  if (name === 'complete') return { ok: true, value: completeLine(args?.text ?? '', noteIndex.all()) }
+  if (name === 'changed') return { ok: true, value: await changedToday(session, clock, noteIndex, vault) }
   return unknownCommand
+}
+
+async function changedToday(
+  session: LibrarySession,
+  clock: CommandClock,
+  noteIndex: NoteIndex,
+  vault: VaultStore
+): Promise<ChangedView> {
+  const root = session.location()
+  if (!root) return { pending: [], accepted: [] }
+  await noteIndex.refresh()
+  const day = clock.today()
+  const destination = workPathFor(day)
+  let recorded: string[] = []
+  try {
+    recorded = outputTitles(await vault.readMarkdown(root, destination))
+  } catch {
+    recorded = []
+  }
+  return classifyChanged(noteIndex.changedOn(day), recorded, destination, noteIndex.all())
 }
 
 async function chooseDirectory(): Promise<string | null> {

@@ -22,12 +22,17 @@ describe('createNodeVault', () => {
 
     const files = await vault.listFiles(root)
     expect(files.map((file) => file.path)).toEqual(['brief.pdf', 'notes/deep.md', 'Readme.MD'])
+    const readme = files.find((file) => file.name === 'Readme.MD')
+    expect(readme?.modifiedMs).toBeGreaterThan(0)
     expect(files.find((file) => file.name === 'brief.pdf')?.markdown).toBe(false)
     expect(files.find((file) => file.name === 'Readme.MD')?.markdown).toBe(true)
     expect(await vault.readMarkdown(root, 'Readme.MD')).toBe('hello\n')
     await expect(vault.readMarkdown(root, 'brief.pdf')).rejects.toThrow('读不到 brief.pdf')
     await expect(vault.readMarkdown(root, '../outside.md')).rejects.toThrow('读不到 ../outside.md')
 
+    const opened = readme?.modifiedMs ?? 0
+    await vault.readMarkdown(root, 'Readme.MD')
+    expect((await vault.listFiles(root)).find((file) => file.name === 'Readme.MD')?.modifiedMs).toBe(opened)
     await vault.writeMarkdown(root, 'Readme.MD', 'saved\r\ntext')
     expect(await readFile(join(root, 'Readme.MD'), 'utf8')).toBe('saved\ntext')
     expect(await vault.readMarkdown(root, 'notes/deep.md')).toBe('# 深\n')
@@ -48,7 +53,9 @@ describe('createNodeVault', () => {
     await writeFile(join(outside, 'secret.md'), 'secret')
     await symlink(join(outside, 'secret.md'), join(root, 'secret.md'))
     const files = await createNodeVault().listFiles(root)
-    expect(files).toEqual([{ path: 'secret.md', name: 'secret.md', markdown: false }])
+    expect(files.map((file) => ({ path: file.path, name: file.name, markdown: file.markdown }))).toEqual([
+      { path: 'secret.md', name: 'secret.md', markdown: false }
+    ])
     await expect(createNodeVault().readMarkdown(root, 'secret.md')).rejects.toThrow('读不到 secret.md')
   })
 

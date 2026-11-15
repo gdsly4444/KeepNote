@@ -90,7 +90,8 @@ function memory(initial: Record<string, string | Uint8Array>): VaultDirectory & 
         .map((path) => ({
           path,
           name: path.slice(path.lastIndexOf('/') + 1),
-          markdown: typeof initial[path] === 'string'
+          markdown: typeof initial[path] === 'string',
+          modifiedMs: 0
         }))
     },
     async readMarkdown(_root: string, relativePath: string): Promise<string> {

@@ -234,6 +234,46 @@ describe('Shell', () => {
     })
     expect(document.activeElement).toBe(field)
   })
+
+  it('moves an accepted note from the pending list into the recorded list', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1600 })
+    let changed = {
+      pending: [{ path: '登录.md', title: '登录跳转', type: 'essay' as const }],
+      accepted: [] as { path: string; title: string; type: 'essay' }[]
+    }
+    const calls: CommandName[] = []
+    window.keepnote = {
+      async run(command) {
+        calls.push(command)
+        if (command === 'today') return { ok: true, value: success('work/2026/11/2026-11-14.md', '今天的工作记录已经在了') }
+        if (command === 'accept') {
+          changed = { pending: [], accepted: [{ path: '登录.md', title: '登录跳转', type: 'essay' }] }
+          return { ok: true, value: success('work/2026/11/2026-11-14.md', '记入了「登录跳转」') }
+        }
+        return { ok: true, value: null }
+      },
+      async query(name) {
+        if (name === 'desk') return { ok: true, value: { today: '2026-11-14', day: '', name: '库', path: null } }
+        if (name === 'changed') return { ok: true, value: changed }
+        if (name === 'library') return { ok: true, value: focusLibrary() }
+        return { ok: true, value: null }
+      },
+      subscribe() {
+        return () => undefined
+      }
+    }
+    const container = await render()
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(container.querySelector('[data-changed="pending"]')?.textContent).toContain('登录跳转')
+    await click(container, '登录跳转')
+    expect(calls).toContain('accept')
+    expect(container.querySelector('[data-changed="pending"]')?.textContent).not.toContain('登录跳转')
+    expect(container.querySelector('[data-changed="accepted"]')?.textContent).toContain('登录跳转')
+    expect(container.querySelector('.work-page')).not.toBeNull()
+  })
 })
 
 async function render(): Promise<HTMLDivElement> {

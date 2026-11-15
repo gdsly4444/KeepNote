@@ -1,6 +1,6 @@
 import { watch } from 'node:fs'
 import type { Dirent } from 'node:fs'
-import { mkdir, open, readdir, readFile, realpath, rename, rm } from 'node:fs/promises'
+import { lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
 import { contractPath, joinPath, normalizeNewlines, parentPath, resolveInside } from '../platform'
 import { writeAtomic, type AtomicIO } from './atomic'
 import { isMarkdownName, isTemporaryName, type ListedFile, type VaultStore } from './types'
@@ -56,21 +56,23 @@ async function walk(root: string, directory: string, found: ListedFile[]): Promi
       continue
     }
     if (!entry.isFile()) continue
-    found.push(listed(root, absolute, entry.name, true))
+    found.push(await listed(root, absolute, entry.name, true))
   }
 }
 
 async function listedSymlink(root: string, absolute: string, name: string): Promise<ListedFile> {
   const real = await realpath(absolute).catch(() => null)
   const inside = real !== null && resolveInside(root, contractPath(root, real)) !== null
-  return listed(root, absolute, name, inside)
+  return listed(root, absolute, name, inside, false)
 }
 
-function listed(root: string, absolute: string, name: string, readable: boolean): ListedFile {
+async function listed(root: string, absolute: string, name: string, readable: boolean, follow = true): Promise<ListedFile> {
+  const info = await (follow ? stat(absolute) : lstat(absolute)).catch(() => null)
   return {
     path: contractPath(root, absolute),
     name,
-    markdown: readable && isMarkdownName(name)
+    markdown: readable && isMarkdownName(name),
+    modifiedMs: info?.mtimeMs ?? 0
   }
 }
 

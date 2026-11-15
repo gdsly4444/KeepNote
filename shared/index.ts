@@ -1,11 +1,15 @@
 export type {
   BridgeResult,
+  ChangedNote,
+  ChangedView,
   CommandArgs,
   CommandName,
   CommandSuccess,
+  CompletionItem,
   DeskView,
   EventName,
   KeepNoteBridge,
+  QueryArgs,
   QueryName,
   QueryValue
 } from './bridge'

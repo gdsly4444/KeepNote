@@ -164,6 +164,12 @@
   outline-offset: 3px;
 }
 
+.shell-file:disabled {
+  color: var(--ink-muted);
+  opacity: 1;
+  cursor: default;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell,
   .shell-fade {

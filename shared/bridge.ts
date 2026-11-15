@@ -11,8 +11,9 @@ export type CommandName =
   | 'now'
   | 'leave'
   | 'log'
+  | 'accept'
 
-export type QueryName = 'ping' | 'library' | 'desk'
+export type QueryName = 'ping' | 'library' | 'desk' | 'complete' | 'changed'
 
 export type EventName = 'ready' | 'library-changed'
 
@@ -24,6 +25,10 @@ export interface CommandArgs {
   title?: string
   path?: string
   currentPath?: string
+}
+
+export interface QueryArgs {
+  text?: string
 }
 
 export interface CommandSuccess {
@@ -40,10 +45,27 @@ export interface DeskView {
   path: string | null
 }
 
-export type QueryValue = LibraryStatus | DeskView | null
+export interface CompletionItem {
+  kind: 'command' | 'type' | 'note'
+  label: string
+  value: string
+}
+
+export interface ChangedNote {
+  path: string
+  title: string
+  type: DocumentType
+}
+
+export interface ChangedView {
+  pending: ChangedNote[]
+  accepted: ChangedNote[]
+}
+
+export type QueryValue = LibraryStatus | DeskView | CompletionItem[] | ChangedView | null
 
 export interface KeepNoteBridge {
   run(command: CommandName, args?: CommandArgs): Promise<BridgeResult<CommandSuccess | null>>
-  query(name: QueryName): Promise<BridgeResult<QueryValue>>
+  query(name: QueryName, args?: QueryArgs): Promise<BridgeResult<QueryValue>>
   subscribe(event: EventName, listener: () => void): () => void
 }

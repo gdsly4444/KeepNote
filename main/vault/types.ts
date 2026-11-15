@@ -2,6 +2,7 @@ export interface ListedFile {
   path: string
   name: string
   markdown: boolean
+  modifiedMs: number
 }
 
 export interface VaultDirectory {

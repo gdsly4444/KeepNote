@@ -294,6 +294,62 @@ describe('command registry', () => {
     expect(notes.files.get('work/2026/11/2026-11-14.md')).toBe('二')
   })
 
+  it('opens a note by its title and reads that file once', async () => {
+    const notes = memoryNotes({ '登录.md': note(['---', 'type: essay', '---', '', '# 登录跳转']) })
+    const registry = createCommandRegistry({
+      notes,
+      parse: parseMarkdown,
+      root: () => '/vault',
+      clock: frozenClock(),
+      index: {
+        findByName: (name) => (name === '登录跳转' ? [{ path: '登录.md', title: '登录跳转', type: 'essay' }] : []),
+        changedOn: () => []
+      }
+    })
+    const opened = await registry.execute('open', { path: '登录跳转' })
+    expect(opened).toMatchObject({ ok: true, value: { path: '登录.md', title: '登录跳转' } })
+    expect(notes.reads).toEqual(['登录.md'])
+  })
+
+  it('records a note changed today and does not write when the note was only opened', async () => {
+    const notes = memoryNotes({
+      [workPath]: note(['---', 'type: work', '---', '', '# 2026-11-14', '', '## 在做', '', '## 记录', '', '## 产出', '', '## 留下']),
+      '登录.md': note(['---', 'type: essay', '---', '', '# 登录跳转'])
+    })
+    const essay = notes.files.get('登录.md')
+    const registry = createCommandRegistry({
+      notes,
+      parse: parseMarkdown,
+      root: () => '/vault',
+      clock: frozenClock(),
+      index: {
+        findByName: (name) => (name === '登录跳转' || name === '登录.md' ? [{ path: '登录.md', title: '登录跳转', type: 'essay' }] : []),
+        changedOn: () => [{ path: '登录.md', title: '登录跳转', type: 'essay' }]
+      }
+    })
+    const accepted = await registry.execute('accept', { path: '登录跳转' })
+    expect(accepted).toMatchObject({ ok: true, value: { message: '记入了「登录跳转」' } })
+    expect(notes.files.get('登录.md')).toBe(essay)
+    expect(notes.files.get(workPath)).toContain('- [[登录跳转]]')
+    expect(notes.writes).toEqual([workPath])
+    await registry.execute('accept', { path: '登录跳转' })
+    expect(notes.writes).toEqual([workPath])
+
+    const quiet = memoryNotes({ '旧.md': note(['---', 'type: essay', '---', '', '# 旧']) })
+    const skipped = createCommandRegistry({
+      notes: quiet,
+      parse: parseMarkdown,
+      root: () => '/vault',
+      clock: frozenClock(),
+      index: {
+        findByName: () => [{ path: '旧.md', title: '旧', type: 'essay' }],
+        changedOn: () => []
+      }
+    })
+    expect(await skipped.execute('accept', { path: '旧' })).toMatchObject({ ok: false, code: 'unchanged' })
+    expect(quiet.writes).toEqual([])
+  })
+
   it('formats the system clock as a local day and minute', () => {
     const clock = systemClock()
     expect(clock.today()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -302,7 +358,7 @@ describe('command registry', () => {
 
   it('keeps the command module off the disk and the window', () => {
     const directory = dirname(fileURLToPath(import.meta.url))
-    const source = ['index.ts', 'registry.ts', 'text.ts']
+    const source = ['index.ts', 'registry.ts', 'text.ts', 'complete.ts']
       .map((name) => readFileSync(join(directory, name), 'utf8'))
       .join('\n')
     expect(source).not.toContain('node:fs')
@@ -345,12 +401,14 @@ function memoryNotes(seed: Record<string, string> = {}, others: string[] = []): 
       const markdown: ListedFile[] = [...files.keys()].map((path) => ({
         path,
         name: path.slice(path.lastIndexOf('/') + 1),
-        markdown: true
+        markdown: true,
+        modifiedMs: 0
       }))
       const rest: ListedFile[] = others.map((path) => ({
         path,
         name: path.slice(path.lastIndexOf('/') + 1),
-        markdown: false
+        markdown: false,
+        modifiedMs: 0
       }))
       return [...markdown, ...rest]
     },

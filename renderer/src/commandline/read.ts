@@ -1,6 +1,6 @@
 import type { CommandArgs, CommandName, DocumentType } from '../../../shared'
 
-const names = ['today', 'diary', 'log', 'now', 'leave', 'new', 'open'] as const
+const names = ['today', 'diary', 'log', 'now', 'leave', 'new', 'open', 'accept'] as const
 
 type LineCommand = (typeof names)[number]
 
@@ -15,7 +15,7 @@ export function readCommandLine(input: string): { command: CommandName; args: Co
   if (name === 'diary' || name === 'log' || name === 'now' || name === 'leave') {
     return { command: name, args: rest ? { text: rest } : {} }
   }
-  if (name === 'open') return rest ? { command: 'open', args: { path: rest } } : { command: 'open', args: {} }
+  if (name === 'open' || name === 'accept') return rest ? { command: name, args: { path: rest } } : { command: name, args: {} }
   return readNew(rest)
 }
 
