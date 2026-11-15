@@ -6,6 +6,19 @@ export function journalTemplate(day: string, time: string): string {
   return document('journal', [`# ${day}`, '', `## ${time}`])
 }
 
+export function appendJournalEntry(source: string, time: string, text: string): string {
+  const lines = source.replace(/\n+$/, '').split('\n')
+  let heading = -1
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index]?.startsWith('## ')) heading = index
+  }
+  const entry = [`## ${time}`, '', text]
+  if (heading >= 0 && lines.slice(heading + 1).every((line) => line.trim() === '')) {
+    return finish([...lines.slice(0, heading), ...entry])
+  }
+  return finish([...lines, '', ...entry])
+}
+
 export function noteTemplate(type: 'essay' | 'list' | 'tech', title: string): string {
   return document(type, [`# ${title}`])
 }

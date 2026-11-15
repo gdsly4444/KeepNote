@@ -3,9 +3,11 @@ export type {
   CommandArgs,
   CommandName,
   CommandSuccess,
+  DeskView,
   EventName,
   KeepNoteBridge,
-  QueryName
+  QueryName,
+  QueryValue
 } from './bridge'
 export type {
   DocumentType,

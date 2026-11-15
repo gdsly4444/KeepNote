@@ -1,7 +1,7 @@
 import type { BridgeResult, CommandArgs, CommandSuccess, DocumentType, MarkdownDocument } from '../../shared'
 import { baseName, normalizeNewlines, portablePath, samePath } from '../platform'
 import type { ListedFile } from '../vault'
-import { appendSection, journalTemplate, noteTemplate, setSection, workTemplate } from './text'
+import { appendJournalEntry, appendSection, journalTemplate, noteTemplate, setSection, workTemplate } from './text'
 
 const documentTypes = ['work', 'essay', 'journal', 'list', 'tech'] as const
 
@@ -65,6 +65,7 @@ export function createCommandRegistry(deps: CommandDeps): CommandRegistry {
   register({ name: 'diary', appliesTo: 'any', run: runDiary })
   register({ name: 'new', appliesTo: 'any', run: runNew })
   register({ name: 'open', appliesTo: 'any', run: runOpen })
+  register({ name: 'save', appliesTo: 'any', run: runSave })
   register({ name: 'now', appliesTo: 'any', run: runNow })
   register({ name: 'leave', appliesTo: 'any', run: runLeave })
   register({ name: 'log', appliesTo: 'any', run: runLog })
@@ -102,11 +103,18 @@ async function runToday(_args: CommandArgs, tools: CommandTools): Promise<Bridge
   return done(tools, note.value, note.value.created ? '写下了今天的工作记录' : '今天的工作记录已经在了')
 }
 
-async function runDiary(_args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
+async function runDiary(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
   const day = tools.clock.today()
-  const note = await ensureDaily(tools, 'journal', journalTemplate(day, tools.clock.time()))
+  const note = await loadDaily(tools, 'journal', journalTemplate(day, tools.clock.time()))
   if (!note.ok) return note
-  return done(tools, note.value, note.value.created ? '写下了今天的日记' : '今天的日记已经在了')
+  const text = sentence(args.text)
+  if (!text) {
+    if (note.value.created) await tools.notes.writeMarkdown(tools.root, note.value.path, note.value.source)
+    return done(tools, note.value, note.value.created ? '写下了今天的日记' : '今天的日记已经在了')
+  }
+  const next = appendJournalEntry(note.value.source, tools.clock.time(), text)
+  await tools.notes.writeMarkdown(tools.root, note.value.path, next)
+  return done(tools, { ...note.value, source: next }, '记在了文末')
 }
 
 async function runNew(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
@@ -136,6 +144,17 @@ async function runOpen(args: CommandArgs, tools: CommandTools): Promise<BridgeRe
     ok: true,
     value: { path: note.value.path, title: note.value.title, created: false, message: `打开了「${note.value.title}」` }
   }
+}
+
+async function runSave(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
+  if (!args.path) return fail('missing-path', '缺少要保存的文档')
+  if (args.text === undefined) return fail('missing-text', '缺少要保存的正文')
+  const note = await readNote(tools, args.path)
+  if (!note.ok) return note
+  const next = normalizeNewlines(args.text)
+  if (next !== note.value.source) await tools.notes.writeMarkdown(tools.root, note.value.path, next)
+  const parsed = tools.parse({ path: note.value.path, name: baseName(note.value.path) }, next)
+  return { ok: true, value: { path: note.value.path, title: parsed.title, created: false, message: '已保存' } }
 }
 
 async function runNow(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {

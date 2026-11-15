@@ -1,0 +1,91 @@
+.journal-page {
+  color: var(--ink);
+  font-family: var(--font-serif);
+}
+
+.journal-status {
+  width: min(100%, var(--measure-journal));
+  margin: 0 auto 8px;
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--size-aux);
+  font-weight: var(--weight-aux);
+  line-height: var(--leading-ui);
+  text-align: end;
+}
+
+.journal-column {
+  width: min(100%, var(--measure-journal));
+  margin-inline: auto;
+  line-height: var(--leading-journal);
+}
+
+.journal-column .ProseMirror {
+  min-height: 40vh;
+  outline: none;
+}
+
+.journal-column .ProseMirror h1 {
+  margin: 0 0 0.45em;
+  font-size: var(--size-title);
+  font-weight: var(--weight-title);
+  line-height: 1.25;
+}
+
+.journal-column .ProseMirror h2,
+.journal-column .ProseMirror h3 {
+  margin: var(--gap-journal) 0 0.2em;
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  font-weight: var(--weight-control);
+  line-height: 1.4;
+}
+
+.journal-column .ProseMirror > p,
+.journal-column .ProseMirror blockquote {
+  margin: var(--gap-journal) 0;
+}
+
+.journal-column .ProseMirror pre,
+.journal-column .ProseMirror code {
+  font-family: var(--font-mono);
+}
+
+.journal-mode {
+  margin: 0 0 16px;
+}
+
+.journal-source {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  line-height: 28px;
+}
+
+.journal-compose {
+  position: sticky;
+  bottom: 0;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 28px;
+  padding: 14px 0;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  line-height: var(--leading-ui);
+}
+
+.journal-compose:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

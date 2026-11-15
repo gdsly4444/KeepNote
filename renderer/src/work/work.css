@@ -1,0 +1,139 @@
+.work-page {
+  width: min(100%, var(--measure-work));
+  margin-inline: auto;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: var(--leading-note);
+}
+
+.work-stick {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: 12px;
+  background: var(--paper);
+}
+
+.work-status {
+  margin: 0 0 8px;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+  font-weight: var(--weight-aux);
+  line-height: var(--leading-ui);
+  text-align: end;
+}
+
+.work-page h1 {
+  margin: 0;
+  font-size: var(--size-title);
+  font-weight: var(--weight-title);
+  line-height: 1.25;
+}
+
+.work-page h2 {
+  margin: 1.1em 0 0.35em;
+  font-size: 1rem;
+  font-weight: var(--weight-title);
+  line-height: 1.3;
+}
+
+.work-doing {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--size-doing);
+  line-height: 1.35;
+}
+
+.work-record {
+  display: grid;
+  grid-template-columns: 6ch minmax(0, 1fr);
+  column-gap: 0.8em;
+  align-items: baseline;
+  margin: var(--gap-note) 0;
+}
+
+.work-time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.work-record input,
+.work-task input[type='text'] {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.work-output {
+  display: block;
+  margin: var(--gap-note) 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.work-output:hover {
+  color: var(--accent);
+}
+
+.work-raw {
+  margin: var(--gap-note) 0;
+}
+
+.work-left .work-task {
+  display: grid;
+  grid-template-columns: 1.25em minmax(0, 1fr);
+  column-gap: 0.55em;
+  align-items: center;
+  margin: var(--gap-list) 0;
+  line-height: var(--leading-list);
+}
+
+.work-task[data-done='true'] {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+.work-mode {
+  margin: 0 0 12px;
+}
+
+.work-source {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  line-height: 28px;
+}
+
+.work-doing:focus-visible,
+.work-record input:focus-visible,
+.work-task input:focus-visible,
+.work-output:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

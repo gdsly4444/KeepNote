@@ -1,10 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
-import { join } from 'node:path'
-import type { BridgeResult, CommandArgs, CommandName, CommandSuccess, LibraryStatus, QueryName } from '../shared'
-import { createCommandRegistry, systemClock, type CommandRegistry } from './commands'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import type { BridgeResult, CommandArgs, CommandName, CommandSuccess, DeskView, QueryName } from '../shared'
+import { createCommandRegistry, systemClock, type CommandClock, type CommandRegistry } from './commands'
 import { parseMarkdown } from './documents'
-import { createLibrarySession, type LibrarySession } from './library'
-import { quitsWhenLastWindowCloses } from './platform'
+import { createDeskStore, createLibrarySession, type DeskStore, type LibrarySession } from './library'
+import { baseName, quitsWhenLastWindowCloses } from './platform'
 import { createNodeVault } from './vault'
 
 const unknownCommand: BridgeResult<null> = { ok: false, code: 'unknown-command', message: '未知命令' }
@@ -14,13 +15,27 @@ let mainWindow: BrowserWindow | null = null
 export function startApp(): void {
   const vault = createNodeVault()
   const session = createLibrarySession(vault, parseMarkdown)
+  const clock = systemClock()
+  const desk = createDeskStore(join(app.getPath('userData'), 'desk.json'), {
+    read(path) {
+      try {
+        return readFileSync(path, 'utf8')
+      } catch {
+        return null
+      }
+    },
+    write(path, text) {
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, text)
+    }
+  })
   const commands = createCommandRegistry({
     notes: vault,
     parse: parseMarkdown,
     root: () => session.location(),
-    clock: systemClock()
+    clock
   })
-  registerBridge(session, commands)
+  registerBridge(session, commands, desk, clock)
   app.on('before-quit', () => {
     session.close()
   })
@@ -37,7 +52,9 @@ export function startApp(): void {
     if (app.isReady()) revealWindow()
   })
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    const saved = desk.read()
+    if (saved.root) await session.open(saved.root)
     createWindow()
   })
 }
@@ -99,12 +116,17 @@ function createWindow(): BrowserWindow {
   return window
 }
 
-function registerBridge(session: LibrarySession, commands: CommandRegistry): void {
+function registerBridge(
+  session: LibrarySession,
+  commands: CommandRegistry,
+  desk: DeskStore,
+  clock: CommandClock
+): void {
   ipcMain.handle('keepnote:run', (event, command: CommandName, args?: CommandArgs) => {
-    return runCommand(event.sender, command, args, session, commands)
+    return runCommand(event.sender, command, args, session, commands, desk, clock)
   })
   ipcMain.handle('keepnote:query', (_event, name: QueryName) => {
-    return runQuery(name, session)
+    return runQuery(name, session, desk, clock)
   })
   session.subscribe(() => {
     const contents = mainWindow?.webContents
@@ -113,27 +135,48 @@ function registerBridge(session: LibrarySession, commands: CommandRegistry): voi
   })
 }
 
+const opensDocument = new Set<CommandName>(['today', 'diary', 'new', 'open'])
+
 async function runCommand(
   sender: WebContents,
   command: CommandName,
   args: CommandArgs | undefined,
   session: LibrarySession,
-  commands: CommandRegistry
+  commands: CommandRegistry,
+  desk: DeskStore,
+  clock: CommandClock
 ): Promise<BridgeResult<CommandSuccess | null>> {
   if (command === 'ping') {
     sender.send('keepnote:event:ready')
     return { ok: true, value: null }
   }
-  if (command === 'open-library') return session.open(await chooseDirectory())
-  return commands.execute(command, args)
+  if (command === 'open-library') {
+    const chosen = await chooseDirectory()
+    const opened = await session.open(chosen)
+    if (opened.ok && chosen) desk.write({ day: clock.today(), root: chosen, path: null })
+    return opened
+  }
+  const result = await commands.execute(command, args)
+  const root = session.location()
+  if (result.ok && result.value && root && opensDocument.has(command)) {
+    desk.write({ day: clock.today(), root, path: result.value.path })
+  }
+  return result
 }
 
 async function runQuery(
   name: QueryName,
-  session: LibrarySession
-): Promise<BridgeResult<LibraryStatus | null>> {
+  session: LibrarySession,
+  desk: DeskStore,
+  clock: CommandClock
+): Promise<BridgeResult<DeskView | Awaited<ReturnType<LibrarySession['current']>> | null>> {
   if (name === 'ping') return { ok: true, value: null }
   if (name === 'library') return { ok: true, value: await session.current() }
+  if (name === 'desk') {
+    const saved = desk.read()
+    const root = session.location()
+    return { ok: true, value: { today: clock.today(), day: saved.day, name: root ? baseName(root) : '', path: saved.path } }
+  }
   return unknownCommand
 }
 

@@ -1,0 +1,77 @@
+.nav-side,
+.context-side {
+  padding: 16px 18px 28px;
+}
+
+.nav-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nav-create-button,
+.shell-split {
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: var(--size-aux);
+  cursor: pointer;
+}
+
+.nav-create-button {
+  padding: 0.2em 0.15em;
+}
+
+.nav-create-button:hover,
+.shell-split:hover {
+  background: var(--control-hover);
+}
+
+.nav-create-button:focus,
+.shell-split:focus {
+  outline: none;
+}
+
+.nav-create-button:focus-visible,
+.shell-split:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.nav-mark {
+  margin-right: 0.45em;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+}
+
+.nav-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  color: var(--ink);
+}
+
+.file-glyph {
+  width: 0.9em;
+  height: 0.9em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+}
+
+.side-empty {
+  margin: 18px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+}
+
+.context-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.context-list li + li {
+  margin-top: 0.45em;
+}

@@ -36,9 +36,32 @@ describe('LibraryView', () => {
     })
     expect(note).toContain('a.md')
     expect(note).not.toContain('秘密正文')
+    expect(markup(noteStatus(), vi.fn())).toContain('class="library-file"')
+    expect(markup(noteStatus(), vi.fn(), '没有')).toContain('没有相符的')
+    expect(markup(noteStatus(), vi.fn(), '没有')).not.toContain('a.md')
+    expect(markup(noteStatus(), vi.fn(), '标题')).toContain('a.md')
+    expect(pdf).not.toContain('class="library-file"')
   })
 })
 
-function markup(status: LibraryStatus): string {
-  return renderToStaticMarkup(createElement(LibraryView, { status, onOpen: vi.fn() }))
+function markup(status: LibraryStatus, onSelect?: (path: string) => void, query = ''): string {
+  return renderToStaticMarkup(createElement(LibraryView, { status, query, onOpen: vi.fn(), onSelect }))
+}
+
+function noteStatus(): LibraryStatus {
+  return {
+    state: 'ready',
+    entries: [
+      {
+        kind: 'markdown',
+        path: 'a.md',
+        name: 'a.md',
+        type: 'essay',
+        typeSource: 'default',
+        title: '标题',
+        body: '秘密正文',
+        outline: []
+      }
+    ]
+  }
 }

@@ -7,11 +7,12 @@ export type CommandName =
   | 'diary'
   | 'new'
   | 'open'
+  | 'save'
   | 'now'
   | 'leave'
   | 'log'
 
-export type QueryName = 'ping' | 'library'
+export type QueryName = 'ping' | 'library' | 'desk'
 
 export type EventName = 'ready' | 'library-changed'
 
@@ -32,8 +33,17 @@ export interface CommandSuccess {
   message: string
 }
 
+export interface DeskView {
+  today: string
+  day: string
+  name: string
+  path: string | null
+}
+
+export type QueryValue = LibraryStatus | DeskView | null
+
 export interface KeepNoteBridge {
   run(command: CommandName, args?: CommandArgs): Promise<BridgeResult<CommandSuccess | null>>
-  query(name: QueryName): Promise<BridgeResult<LibraryStatus | null>>
+  query(name: QueryName): Promise<BridgeResult<QueryValue>>
   subscribe(event: EventName, listener: () => void): () => void
 }

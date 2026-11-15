@@ -42,6 +42,42 @@ describe('command registry', () => {
     expect(notes.writes).toEqual([journalPath])
   })
 
+  it('appends a diary entry at the end without moving earlier ones', async () => {
+    const notes = memoryNotes()
+    const clock = frozenClock()
+    const registry = registryWith(notes, clock)
+    await registry.execute('diary')
+    clock.at = '15:40'
+    const morning = await registry.execute('diary', { text: '早上' })
+    clock.at = '21:04'
+    const evening = await registry.execute('diary', { text: '晚上' })
+    const source = notes.files.get(journalPath)
+
+    expect(morning).toMatchObject({ ok: true, value: { created: false, message: '记在了文末' } })
+    expect(evening).toMatchObject({ ok: true, value: { created: false, message: '记在了文末' } })
+    expect(source).toBe(
+      note([
+        '---',
+        'type: journal',
+        '---',
+        '',
+        '# 2026-11-14',
+        '',
+        '## 15:40',
+        '',
+        '早上',
+        '',
+        '## 21:04',
+        '',
+        '晚上'
+      ])
+    )
+    expect(source?.indexOf('早上')).toBeLessThan(source?.indexOf('晚上') ?? -1)
+    const kept = source
+    await registry.execute('diary')
+    expect(notes.files.get(journalPath)).toBe(kept)
+  })
+
   it('appends a log from another document, then now and leave edit only their sections', async () => {
     const essay = ['---', 'type: essay', '---', '', '# 周会', '', '正文', ''].join('\n') + '\n'
     const notes = memoryNotes({ '周会.md': essay })
@@ -136,6 +172,28 @@ describe('command registry', () => {
     expect(notes.files.get('打包.md')).toBe(note(['---', 'type: list', '---', '', '# 打包']))
     expect(dated).toMatchObject({ ok: true, value: { path: workPath, created: true } })
     expect(notes.files.has('不该出现.md')).toBe(false)
+  })
+
+  it('saves an existing note and leaves it untouched when the text is unchanged', async () => {
+    const notes = memoryNotes({ '阅读.md': '# 阅读\n' })
+    const registry = registryWith(notes)
+    const saved = await registry.execute('save', { path: '阅读.md', text: '# 阅读\n\n一段\n' })
+    const again = await registry.execute('save', { path: '阅读.md', text: '# 阅读\n\n一段\n' })
+    expect(saved).toMatchObject({ ok: true, value: { path: '阅读.md', title: '阅读', created: false, message: '已保存' } })
+    expect(again).toMatchObject({ ok: true, value: { message: '已保存' } })
+    expect(notes.files.get('阅读.md')).toBe('# 阅读\n\n一段\n')
+    expect(notes.writes).toEqual(['阅读.md'])
+    expect(await registry.execute('save', { path: 'missing.md', text: 'x' })).toEqual({
+      ok: false,
+      code: 'not-found',
+      message: '没有这篇'
+    })
+    expect(await registry.execute('save', { path: '../secret.md', text: 'x' })).toEqual({
+      ok: false,
+      code: 'not-found',
+      message: '没有这篇'
+    })
+    expect(notes.reads).not.toContain('../secret.md')
   })
 
   it('opens a note by its path and returns a failure instead of throwing', async () => {

@@ -31,6 +31,10 @@
   --gap-note: 0.45em;
   --gap-list: 0.12em;
   --measure-essay: 68ch;
+  --measure-journal: 74ch;
+  --measure-work: 60ch;
+  --measure-list: 64ch;
+  --measure-tech: 104ch;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --duration-short: 140ms;
   --duration-move: 180ms;

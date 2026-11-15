@@ -1,0 +1,63 @@
+.command-bar {
+  position: relative;
+  background: var(--sidebar);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+}
+
+.command-pop {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  background: var(--sidebar);
+}
+
+.command-complete {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command-echo {
+  margin: 0;
+  padding: 8px 16px 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.command-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+.command-prompt {
+  color: var(--ink-muted);
+}
+
+.command-line input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  caret-color: var(--ink);
+}
+
+.command-line input:focus {
+  outline: none;
+}
+
+.command-line input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

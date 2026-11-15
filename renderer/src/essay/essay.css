@@ -1,0 +1,134 @@
+.essay-page {
+  font-family: var(--font-serif);
+  color: var(--ink);
+}
+
+.essay-status {
+  margin: 0 0 8px;
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--size-aux);
+  font-weight: var(--weight-aux);
+  line-height: var(--leading-ui);
+  text-align: end;
+}
+
+.essay-mode {
+  margin: 0 0 28px;
+}
+
+.essay-column {
+  width: min(100%, var(--measure-essay));
+  margin-inline: auto;
+  line-height: var(--leading-essay);
+}
+
+.essay-column .ProseMirror {
+  min-height: 60vh;
+  outline: none;
+}
+
+.essay-page[data-mode='reading'] .ProseMirror {
+  caret-color: transparent;
+}
+
+.essay-page[data-mode='editing'] .ProseMirror {
+  caret-color: var(--ink);
+}
+
+.essay-column .ProseMirror h1,
+.essay-column .ProseMirror h2,
+.essay-column .ProseMirror h3,
+.essay-column .ProseMirror h4,
+.essay-column .ProseMirror h5,
+.essay-column .ProseMirror h6 {
+  margin: 1.25em 0 0.4em;
+  font-weight: var(--weight-title);
+  line-height: 1.25;
+}
+
+.essay-column .ProseMirror h1 {
+  font-size: var(--size-title);
+}
+
+.essay-column .ProseMirror h2 {
+  font-size: 1.35rem;
+}
+
+.essay-column .ProseMirror h3 {
+  font-size: 1.15rem;
+}
+
+.essay-column .ProseMirror > p,
+.essay-column .ProseMirror blockquote {
+  margin: var(--gap-essay) 0;
+}
+
+.essay-column .ProseMirror li p {
+  margin: 0.15em 0;
+}
+
+.essay-column .ProseMirror blockquote {
+  margin-left: 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+}
+
+.essay-column .ProseMirror pre {
+  margin: var(--gap-essay) 0;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  line-height: 1.55;
+  background: var(--sidebar);
+  border-radius: 6px;
+}
+
+.essay-column .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.essay-column .ProseMirror img {
+  display: block;
+  max-width: 100%;
+  margin: var(--gap-essay) 0;
+}
+
+.essay-column .ProseMirror ul,
+.essay-column .ProseMirror ol {
+  margin: var(--gap-essay) 0;
+  padding-left: 1.3em;
+}
+
+.essay-column .ProseMirror ul[data-type='taskList'] {
+  padding-left: 0;
+  list-style: none;
+}
+
+.essay-column .ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.55em;
+  align-items: flex-start;
+}
+
+.essay-column .ProseMirror ul[data-type='taskList'] li label {
+  margin-top: 0.45em;
+}
+
+.essay-source {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  line-height: 28px;
+}
