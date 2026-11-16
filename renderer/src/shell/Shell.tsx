@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import type { ChangedView, CommandName, DeskView, DocumentType, KeepNoteBridge, LibraryStatus, MarkdownDocument } from '../../../shared'
+import type { AgentEvent, ChangedView, CommandName, DeskView, DocumentType, KeepNoteBridge, LibraryStatus, MarkdownDocument, Proposal } from '../../../shared'
 import { getKeepNote } from '../client'
 import { CommandLine } from '../commandline'
 import { EssayPage } from '../essay'
 import { JournalPage } from '../journal'
 import { LibraryView, loadLibrary, openLibrary } from '../library'
 import { ListPage } from '../list'
-import { ContextSide, NavSide, WorkContext, contextEmpty, contextItems, typeName, type ContextItem } from '../sidebar'
+import { AgentSide, ContextSide, NavSide, WorkContext, contextEmpty, contextItems, typeName, type ContextItem } from '../sidebar'
 import { TechPage, codeBlocks } from '../tech'
 import { WorkPage } from '../work'
 import { fitSides, sideWidth } from './layout'
@@ -40,6 +40,9 @@ export function Shell() {
   const [deskName, setDeskName] = useState('库')
   const [scrollTo, setScrollTo] = useState<PageScroll | null>(null)
   const [changed, setChanged] = useState<ChangedView>({ pending: [], accepted: [] })
+  const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [reads, setReads] = useState<string[]>([])
+  const [agentMessage, setAgentMessage] = useState('')
   const commandRef = useRef<HTMLInputElement>(null)
   const nonce = useRef(0)
   const visit = useRef(0)
@@ -136,6 +139,15 @@ export function Shell() {
 
   useEffect(() => {
     const bridge = getKeepNote()
+    if (!bridge) return
+    return bridge.subscribe('agent', (event) => {
+      if (!event) return
+      applyAgentEvent(event, setReads, setProposal, setAgentMessage)
+    })
+  }, [])
+
+  useEffect(() => {
+    const bridge = getKeepNote()
     if (!bridge || status.state !== 'ready') return
     let cancel = false
     void bridge.query('changed').then((result) => {
@@ -182,6 +194,40 @@ export function Shell() {
     setSelected(result.value.path)
     setFocus(false)
     setCommandVisible(true)
+  }
+
+  async function applyDiff(groupId?: string): Promise<void> {
+    const keepNote = getKeepNote()
+    if (!keepNote) return
+    const result = await keepNote.run('apply-diff', groupId ? { groupId } : {})
+    if (!result.ok) {
+      setNotice(result.message)
+      return
+    }
+    setNotice('')
+    setStatus(await loadLibrary(keepNote))
+    await refreshSession(keepNote, setProposal, setReads)
+    if (result.value?.created && result.value.path) await show(result.value.path)
+  }
+
+  async function discardDiff(): Promise<void> {
+    const keepNote = getKeepNote()
+    if (!keepNote) return
+    const result = await keepNote.run('discard-diff')
+    if (!result.ok) {
+      setNotice(result.message)
+      return
+    }
+    setNotice('')
+    await refreshSession(keepNote, setProposal, setReads)
+  }
+
+  async function askAgent(text: string, selection: string, entry: 'sidebar' | 'selection'): Promise<void> {
+    const keepNote = getKeepNote()
+    if (!keepNote) return
+    const path = markdownDocument(statusRef.current, chosen.current)?.path
+    const result = await keepNote.run('ask', path ? { text, selection, entry, currentPath: path } : { text, selection, entry })
+    if (!result.ok) setNotice(result.message)
   }
 
   async function acceptNote(path: string): Promise<void> {
@@ -362,6 +408,10 @@ export function Shell() {
             document={current}
             bridge={bridge}
             scrollTo={scrollTo}
+            proposal={proposal}
+            onApply={(groupId) => void applyDiff(groupId)}
+            onDiscard={() => void discardDiff()}
+            onAsk={(text, selection) => void askAgent(text, selection, 'selection')}
             onOpenTitle={(title) => {
               const path = pathForTitle(status, title)
               if (path) void show(path)
@@ -385,6 +435,7 @@ export function Shell() {
         ) : (
           <p className="side-empty">还没有打开笔记</p>
         )}
+        {bridge ? <AgentSide reads={reads} message={agentMessage} onAsk={(text) => void askAgent(text, '', 'sidebar')} /> : null}
       </aside>
       {bridge ? (
         <div className="shell-command">
@@ -415,20 +466,72 @@ function DocumentPage({
   document,
   bridge,
   scrollTo,
+  proposal,
+  onApply,
+  onDiscard,
+  onAsk,
   onOpenTitle
 }: {
   document: MarkdownDocument
   bridge: KeepNoteBridge
   scrollTo: PageScroll | null
+  proposal: Proposal | null
+  onApply: (groupId?: string) => void
+  onDiscard: () => void
+  onAsk: (text: string, selection: string) => void
   onOpenTitle: (title: string) => void
 }) {
-  const shared = { path: document.path, body: document.body, bridge }
+  const shared = {
+    path: document.path,
+    body: document.body,
+    bridge,
+    proposal: shownProposal(document.path, proposal),
+    onApply,
+    onDiscard,
+    onAsk
+  }
   const heading = scrollTo ? { text: scrollTo.text, index: scrollTo.index, nonce: scrollTo.nonce } : null
   if (document.type === 'work') return <WorkPage {...shared} scrollTo={heading} onOpenTitle={onOpenTitle} />
   if (document.type === 'journal') return <JournalPage {...shared} scrollTo={heading} autofocus={false} />
   if (document.type === 'list') return <ListPage {...shared} scrollTo={heading} />
   if (document.type === 'tech') return <TechPage {...shared} scrollTo={scrollTo} />
   return <EssayPage {...shared} scrollTo={heading} />
+}
+
+function shownProposal(path: string, proposal: Proposal | null): Proposal | null {
+  if (!proposal) return null
+  if (proposal.path === path) return proposal
+  if (proposal.groups.length > 0 && proposal.groups.every((group) => group.before === '')) return proposal
+  return null
+}
+
+function applyAgentEvent(
+  event: AgentEvent,
+  setReads: (value: string[] | ((items: string[]) => string[])) => void,
+  setProposal: (value: Proposal | null) => void,
+  setAgentMessage: (value: string) => void
+): void {
+  if (event.kind === 'status' && event.state === 'running') {
+    setReads([])
+    setAgentMessage('')
+  }
+  if (event.kind === 'read' && event.path) {
+    const path = event.path
+    setReads((items) => (items.includes(path) ? items : [...items, path]))
+  }
+  if (event.kind === 'diff') setProposal(event.proposal)
+  if ((event.kind === 'text' || event.kind === 'status') && event.text) setAgentMessage(event.text)
+}
+
+async function refreshSession(
+  bridge: KeepNoteBridge,
+  setProposal: (value: Proposal | null) => void,
+  setReads: (value: string[]) => void
+): Promise<void> {
+  const session = await bridge.query('session')
+  if (!session.ok || !session.value || !('proposal' in session.value)) return
+  setProposal(session.value.proposal)
+  setReads([...session.value.reads])
 }
 
 function markdownDocument(status: LibraryStatus, path: string | null): MarkdownDocument | null {

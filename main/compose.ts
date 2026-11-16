@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { BridgeResult, ChangedView, CommandArgs, CommandName, CommandSuccess, DeskView, QueryArgs, QueryName } from '../shared'
+import type { BridgeResult, ChangedView, CommandArgs, CommandName, CommandSuccess, DeskView, DocumentType, QueryArgs, QueryName, SessionView } from '../shared'
+import { createAgent, type AgentSession } from './agent'
 import { classifyChanged, completeLine, createCommandRegistry, outputTitles, systemClock, workPathFor, type CommandClock, type CommandRegistry } from './commands'
+import { createPiModel } from './model'
 import { parseMarkdown } from './documents'
 import { createNoteIndex, followLibrary, type NoteIndex } from './index/index'
 import { createDeskStore, createLibrarySession, type DeskStore, type LibrarySession } from './library'
@@ -53,16 +55,48 @@ export function startApp(): void {
       return { title: parsed.title, type: parsed.type }
     }
   })
+  const agent = createAgent({
+    model: createPiModel(),
+    notes: {
+      async read(path) {
+        const root = session.location()
+        if (!root) return null
+        try {
+          return await vault.readMarkdown(root, path)
+        } catch {
+          return null
+        }
+      }
+    },
+    search(query) {
+      const needle = query.trim().toLowerCase()
+      if (!needle) return []
+      return noteIndex
+        .all()
+        .filter((note) => note.title.toLowerCase().includes(needle) || note.name.toLowerCase().includes(needle))
+        .map((note) => ({ path: note.path, title: note.title }))
+    },
+    todayPath: () => workPathFor(clock.today()),
+    time: () => clock.time(),
+    budget: 6000,
+    onEvent(event) {
+      const contents = mainWindow?.webContents
+      if (!contents || contents.isDestroyed()) return
+      contents.send('keepnote:event:agent', event)
+    }
+  })
   const commands = createCommandRegistry({
     notes: vault,
     parse: parseMarkdown,
     root: () => session.location(),
     clock,
-    index: noteIndex
+    index: noteIndex,
+    proposals: agent
   })
   followLibrary(session, noteIndex)
-  registerBridge(session, commands, desk, clock, noteIndex, vault)
+  registerBridge(session, commands, desk, clock, noteIndex, vault, agent)
   app.on('before-quit', () => {
+    agent.cancel()
     noteIndex.close()
     session.close()
   })
@@ -150,13 +184,14 @@ function registerBridge(
   desk: DeskStore,
   clock: CommandClock,
   noteIndex: NoteIndex,
-  vault: VaultStore
+  vault: VaultStore,
+  agent: AgentSession
 ): void {
   ipcMain.handle('keepnote:run', (event, command: CommandName, args?: CommandArgs) => {
-    return runCommand(event.sender, command, args, session, commands, desk, clock)
+    return runCommand(event.sender, command, args, session, commands, desk, clock, vault, agent)
   })
   ipcMain.handle('keepnote:query', (_event, name: QueryName, args?: QueryArgs) => {
-    return runQuery(name, args, session, desk, clock, noteIndex, vault)
+    return runQuery(name, args, session, desk, clock, noteIndex, vault, agent)
   })
   session.subscribe(() => {
     const contents = mainWindow?.webContents
@@ -174,12 +209,19 @@ async function runCommand(
   session: LibrarySession,
   commands: CommandRegistry,
   desk: DeskStore,
-  clock: CommandClock
+  clock: CommandClock,
+  vault: VaultStore,
+  agent: AgentSession
 ): Promise<BridgeResult<CommandSuccess | null>> {
   if (command === 'ping') {
     sender.send('keepnote:event:ready')
     return { ok: true, value: null }
   }
+  if (command === 'cancel-agent') {
+    agent.cancel()
+    return { ok: true, value: { path: '', title: '', created: false, message: '已取消' } }
+  }
+  if (command === 'ask') return askAgent(agent, vault, session, args)
   if (command === 'open-library') {
     const chosen = await chooseDirectory()
     const opened = await session.open(chosen)
@@ -201,8 +243,9 @@ async function runQuery(
   desk: DeskStore,
   clock: CommandClock,
   noteIndex: NoteIndex,
-  vault: VaultStore
-): Promise<BridgeResult<DeskView | ChangedView | Awaited<ReturnType<LibrarySession['current']>> | ReturnType<typeof completeLine> | null>> {
+  vault: VaultStore,
+  agent: AgentSession
+): Promise<BridgeResult<DeskView | ChangedView | SessionView | Awaited<ReturnType<LibrarySession['current']>> | ReturnType<typeof completeLine> | null>> {
   if (name === 'ping') return { ok: true, value: null }
   if (name === 'library') return { ok: true, value: await session.current() }
   if (name === 'desk') {
@@ -212,7 +255,40 @@ async function runQuery(
   }
   if (name === 'complete') return { ok: true, value: completeLine(args?.text ?? '', noteIndex.all()) }
   if (name === 'changed') return { ok: true, value: await changedToday(session, clock, noteIndex, vault) }
+  if (name === 'session') return { ok: true, value: agent.view() }
   return unknownCommand
+}
+
+async function askAgent(
+  agent: AgentSession,
+  vault: VaultStore,
+  session: LibrarySession,
+  args: CommandArgs | undefined
+): Promise<BridgeResult<CommandSuccess>> {
+  const root = session.location()
+  if (!root) return { ok: false, code: 'library-closed', message: '还没有打开库' }
+  const path = args?.currentPath ?? ''
+  let type: DocumentType = 'essay'
+  let outline = ''
+  if (path) {
+    try {
+      const source = await vault.readMarkdown(root, path)
+      const parsed = parseMarkdown({ path, name: baseName(path) }, source)
+      type = parsed.type
+      outline = parsed.outline.map((item) => item.text).join('\n')
+    } catch {
+      outline = ''
+    }
+  }
+  const result = await agent.ask({
+    text: args?.text ?? '',
+    path,
+    type,
+    outline,
+    selection: args?.selection ?? '',
+    entry: args?.entry ?? 'command'
+  })
+  return { ok: true, value: { path, title: '', created: false, message: result.message } }
 }
 
 async function changedToday(

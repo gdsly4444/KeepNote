@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { KeepNoteBridge } from '../../../shared'
+import type { KeepNoteBridge, Proposal } from '../../../shared'
+import { ignore, ignoreApply, ignoreAsk, PageAgent } from '../diff'
 import { useNoteSave } from '../client'
 import './work.css'
 import {
@@ -29,7 +30,11 @@ export function WorkPage({
   bridge,
   onOpenTitle,
   scrollTo = null,
-  saveDelay = 400
+  saveDelay = 400,
+  proposal = null,
+  onApply,
+  onDiscard,
+  onAsk
 }: {
   path: string
   body: string
@@ -37,6 +42,10 @@ export function WorkPage({
   onOpenTitle?: (title: string) => void
   scrollTo?: { text: string; index: number; nonce: number } | null
   saveDelay?: number
+  proposal?: Proposal | null
+  onApply?: (groupId?: string) => void
+  onDiscard?: () => void
+  onAsk?: (text: string, selection: string) => void
 }) {
   const [note, setNote] = useState(() => parseWork(body))
   const noteRef = useRef(note)
@@ -48,6 +57,7 @@ export function WorkPage({
   const pendingField = useRef<WorkField | null>(null)
   const pendingDoingLine = useRef(0)
   const [mode, setMode] = useState<'layout' | 'source'>('layout')
+  const [picked, setPicked] = useState('')
   const [source, setSource] = useState(body)
   const save = useNoteSave(bridge, path, serializeWork(note), saveDelay)
 
@@ -126,7 +136,20 @@ export function WorkPage({
   }
 
   return (
-    <article className="work-page" data-mode={mode} ref={pageRef}>
+    <article
+      className="work-page"
+      data-mode={mode}
+      ref={pageRef}
+      onMouseUp={() => setPicked(window.getSelection()?.toString() ?? '')}
+    >
+      <PageAgent
+        type="work"
+        selection={picked}
+        proposal={proposal}
+        onApply={onApply ?? ignoreApply}
+        onDiscard={onDiscard ?? ignore}
+        onAsk={onAsk ?? ignoreAsk}
+      />
       <div className="work-stick">
         <p className="work-status">{save.status}</p>
         <button className="control work-mode" type="button" onClick={mode === 'source' ? showLayout : showSource}>

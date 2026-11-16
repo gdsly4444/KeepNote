@@ -1,6 +1,7 @@
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import type { KeepNoteBridge } from '../../../shared'
+import type { KeepNoteBridge, Proposal } from '../../../shared'
+import { ignore, ignoreApply, ignoreAsk, PageAgent } from '../diff'
 import { useNoteSave } from '../client'
 import {
   essayExtensions,
@@ -24,7 +25,11 @@ export function JournalPage({
   bridge,
   scrollTo = null,
   autofocus = true,
-  saveDelay = 400
+  saveDelay = 400,
+  proposal = null,
+  onApply,
+  onDiscard,
+  onAsk
 }: {
   path: string
   body: string
@@ -32,6 +37,10 @@ export function JournalPage({
   scrollTo?: { text: string; index: number; nonce: number } | null
   autofocus?: boolean
   saveDelay?: number
+  proposal?: Proposal | null
+  onApply?: (groupId?: string) => void
+  onDiscard?: () => void
+  onAsk?: (text: string, selection: string) => void
 }) {
   const initial = splitFrontmatter(body)
   const headRef = useRef(initial.head)
@@ -44,6 +53,7 @@ export function JournalPage({
   const pendingLine = useRef<number | null>(null)
   const [draft, setDraft] = useState('')
   const [mode, setMode] = useState<'layout' | 'source'>('layout')
+  const [picked, setPicked] = useState('')
   const [source, setSource] = useState(body)
   const save = useNoteSave(bridge, path, body, saveDelay)
   const editor = useEditor({
@@ -161,7 +171,15 @@ export function JournalPage({
   }
 
   return (
-    <article className="journal-page" data-mode={mode}>
+    <article className="journal-page" data-mode={mode} onMouseUp={() => setPicked(window.getSelection()?.toString() ?? '')}>
+      <PageAgent
+        type="journal"
+        selection={picked}
+        proposal={proposal}
+        onApply={onApply ?? ignoreApply}
+        onDiscard={onDiscard ?? ignore}
+        onAsk={onAsk ?? ignoreAsk}
+      />
       <p className="journal-status">{save.status}</p>
       <button className="control journal-mode" type="button" onClick={mode === 'source' ? showLayout : showSource}>
         {mode === 'source' ? '排版' : '源码'}

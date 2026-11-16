@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { BridgeResult, CommandArgs, CommandName, CommandSuccess, KeepNoteBridge, LibraryStatus, MarkdownDocument } from '../../../shared'
+import type { AgentEvent, BridgeResult, CommandArgs, CommandName, CommandSuccess, KeepNoteBridge, LibraryStatus, MarkdownDocument } from '../../../shared'
 import { Shell } from './index'
 
 const roots: Root[] = []
@@ -273,6 +273,40 @@ describe('Shell', () => {
     expect(container.querySelector('[data-changed="pending"]')?.textContent).not.toContain('登录跳转')
     expect(container.querySelector('[data-changed="accepted"]')?.textContent).toContain('登录跳转')
     expect(container.querySelector('.work-page')).not.toBeNull()
+  })
+
+  it('lists a file read this turn and sends natural language into the agent session', async () => {
+    const calls: { command: CommandName; args?: CommandArgs }[] = []
+    let agent: ((payload: AgentEvent | null) => void) | null = null
+    window.keepnote = {
+      async run(command, args) {
+        calls.push({ command, args })
+        if (command === 'open' && args?.path) return { ok: true, value: success(args.path, '打开了') }
+        return { ok: true, value: success('', '好') }
+      },
+      async query(name) {
+        if (name === 'desk') return { ok: true, value: { today: '2026-11-14', day: '2026-11-14', name: '库', path: '决定.md' } }
+        if (name === 'library') return { ok: true, value: essayLibrary() }
+        return { ok: true, value: null }
+      },
+      subscribe(event, listener) {
+        if (event === 'agent') agent = listener
+        return () => undefined
+      }
+    }
+    const container = await render()
+    expect(container.querySelector('.essay-page')).not.toBeNull()
+    expect(container.querySelector('.agent-side')?.textContent).toContain('还没有读笔记')
+    await act(async () => {
+      agent?.({ kind: 'read', text: '', path: '决定.md', proposal: null, state: '' })
+    })
+    expect(container.querySelector('.agent-side')?.textContent).toContain('决定.md')
+    await submit(container, '把这篇缩短')
+    expect(calls.some((call) => call.command === 'ask' && call.args?.text === '把这篇缩短' && call.args.currentPath === '决定.md')).toBe(true)
+    const before = calls.length
+    await submit(container, 'rm -rf /')
+    expect(calls).toHaveLength(before)
+    expect(container.querySelector('.command-echo')?.textContent).toBe('未知命令')
   })
 })
 

@@ -1,6 +1,7 @@
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import type { KeepNoteBridge } from '../../../shared'
+import type { KeepNoteBridge, Proposal } from '../../../shared'
+import { ignore, ignoreApply, ignoreAsk, PageAgent } from '../diff'
 import './essay.css'
 import {
   essayExtensions,
@@ -21,13 +22,21 @@ export function EssayPage({
   body,
   bridge,
   scrollTo = null,
-  saveDelay = 400
+  saveDelay = 400,
+  proposal = null,
+  onApply,
+  onDiscard,
+  onAsk
 }: {
   path: string
   body: string
   bridge: KeepNoteBridge
   scrollTo?: { text: string; index: number; nonce: number } | null
   saveDelay?: number
+  proposal?: Proposal | null
+  onApply?: (groupId?: string) => void
+  onDiscard?: () => void
+  onAsk?: (text: string, selection: string) => void
 }) {
   const initial = splitFrontmatter(body)
   const headRef = useRef(initial.head)
@@ -46,6 +55,7 @@ export function EssayPage({
   const sourceRef = useRef<HTMLTextAreaElement>(null)
   const columnRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<'reading' | 'editing' | 'source'>('reading')
+  const [picked, setPicked] = useState('')
   const [source, setSource] = useState(body)
   const [status, setStatus] = useState<'已保存' | '保存中'>('已保存')
 
@@ -190,7 +200,15 @@ export function EssayPage({
   }
 
   return (
-    <article className="essay-page" data-mode={mode}>
+    <article className="essay-page" data-mode={mode} onMouseUp={() => setPicked(window.getSelection()?.toString() ?? '')}>
+      <PageAgent
+        type="essay"
+        selection={picked}
+        proposal={proposal}
+        onApply={onApply ?? ignoreApply}
+        onDiscard={onDiscard ?? ignore}
+        onAsk={onAsk ?? ignoreAsk}
+      />
       <p className="essay-status">{status}</p>
       <button className="control essay-mode" type="button" onClick={mode === 'source' ? showLayout : showSource}>
         {mode === 'source' ? '排版' : '源码'}

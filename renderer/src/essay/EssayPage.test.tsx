@@ -147,6 +147,47 @@ describe('EssayPage', () => {
     const line = next.value.slice(0, next.selectionStart).split('\n').length - 1
     expect(next.value.split('\n')[line]).toBe('- 香蕉')
   })
+
+  it('draws a proposed diff on the essay page and keeps the original text when it is discarded', async () => {
+    const applied: (string | undefined)[] = []
+    let discarded = false
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    roots.push(root)
+    await act(async () => {
+      root.render(
+        <EssayPage
+          path="阅读.md"
+          body={essayFixture}
+          bridge={bridge(async () => true)}
+          saveDelay={0}
+          proposal={{
+            id: 'd1',
+            path: '阅读.md',
+            type: 'essay',
+            groups: [{ id: 'g1', unit: 'paragraph', before: '选区里的句子', after: '短句' }],
+            conversion: null
+          }}
+          onApply={(groupId) => {
+            applied.push(groupId)
+          }}
+          onDiscard={() => {
+            discarded = true
+          }}
+        />
+      )
+    })
+    const card = container.querySelector('.essay-page .diff-card')
+    expect(card?.textContent).toContain('选区里的句子')
+    expect(card?.textContent).toContain('短句')
+    await click(container, '接受')
+    expect(applied).toEqual(['g1'])
+    await click(container, '放弃')
+    expect(discarded).toBe(true)
+    await click(container, '源码')
+    expect(sourceField(container).value).toBe(essayFixture)
+  })
 })
 
 async function render(bridgeImpl: KeepNoteBridge): Promise<{ container: HTMLDivElement }> {

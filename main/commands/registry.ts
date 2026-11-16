@@ -1,6 +1,7 @@
-import type { BridgeResult, CommandArgs, CommandSuccess, DocumentType, MarkdownDocument } from '../../shared'
+import type { BridgeResult, CommandArgs, CommandSuccess, DocumentType, MarkdownDocument, Proposal } from '../../shared'
 import { baseName, normalizeNewlines, portablePath, samePath } from '../platform'
 import type { ListedFile } from '../vault'
+import { applyGroups } from './patch'
 import { appendJournalEntry, appendSection, journalTemplate, noteTemplate, outputTitles, setSection, workTemplate } from './text'
 
 const documentTypes = ['work', 'essay', 'journal', 'list', 'tech'] as const
@@ -21,11 +22,18 @@ export interface NoteLookup {
   changedOn(day: string): { path: string; title: string; type: DocumentType }[]
 }
 
+export interface OpenProposals {
+  pending(): Proposal | null
+  accept(groupId?: string): void
+  discard(): void
+}
+
 export interface CommandTools {
   root: string
   clock: CommandClock
   notes: NoteStore
   index: NoteLookup
+  proposals: OpenProposals | null
   parse(file: { path: string; name: string }, source: string): MarkdownDocument
 }
 
@@ -46,6 +54,7 @@ export interface CommandDeps {
   root(): string | null
   clock: CommandClock
   index?: NoteLookup
+  proposals?: OpenProposals
 }
 
 const emptyLookup: NoteLookup = {
@@ -82,6 +91,8 @@ export function createCommandRegistry(deps: CommandDeps): CommandRegistry {
   register({ name: 'leave', appliesTo: 'any', run: runLeave })
   register({ name: 'log', appliesTo: 'any', run: runLog })
   register({ name: 'accept', appliesTo: 'any', run: runAccept })
+  register({ name: 'apply-diff', appliesTo: 'any', run: runApplyDiff })
+  register({ name: 'discard-diff', appliesTo: 'any', run: runDiscardDiff })
 
   return {
     register,
@@ -90,7 +101,14 @@ export function createCommandRegistry(deps: CommandDeps): CommandRegistry {
       if (!command) return fail('unknown-command', '未知命令')
       const root = deps.root()
       if (!root) return fail('library-closed', '还没有打开库')
-      const tools: CommandTools = { root, clock: deps.clock, notes: deps.notes, index: deps.index ?? emptyLookup, parse: deps.parse }
+      const tools: CommandTools = {
+        root,
+        clock: deps.clock,
+        notes: deps.notes,
+        index: deps.index ?? emptyLookup,
+        proposals: deps.proposals ?? null,
+        parse: deps.parse
+      }
       try {
         const input = readArgs(args)
         if (command.appliesTo !== 'any') {
@@ -178,6 +196,30 @@ async function runAccept(args: CommandArgs, tools: CommandTools): Promise<Bridge
   if (!next) return fail('missing-section', '这篇里没有「产出」')
   await tools.notes.writeMarkdown(tools.root, today.value.path, next)
   return done(tools, { ...today.value, source: next }, `记入了「${note.value.title}」`)
+}
+
+async function runApplyDiff(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
+  const proposal = tools.proposals?.pending()
+  if (!proposal) return fail('no-diff', '没有要接受的差异')
+  if (proposal.conversion && proposal.groups.length === 0) return fail('needs-conversion', '类型不对，先不写入')
+  const groups = args.groupId ? proposal.groups.filter((group) => group.id === args.groupId) : proposal.groups
+  if (groups.length === 0) return fail('no-diff', '没有要接受的差异')
+  const current = await readSource(tools, proposal.path)
+  if (!current.ok) return current
+  const next = applyGroups(current.value, groups)
+  if (next === null) return fail('stale-diff', '原文已经变了')
+  if (next !== current.value) await tools.notes.writeMarkdown(tools.root, proposal.path, next)
+  tools.proposals?.accept(args.groupId)
+  return {
+    ok: true,
+    value: { path: proposal.path, title: proposal.path, created: current.value === '', message: '接受了差异' }
+  }
+}
+
+async function runDiscardDiff(_args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
+  if (!tools.proposals?.pending()) return fail('no-diff', '没有要放弃的差异')
+  tools.proposals.discard()
+  return { ok: true, value: { path: '', title: '', created: false, message: '已放弃' } }
 }
 
 async function runSave(args: CommandArgs, tools: CommandTools): Promise<BridgeResult<CommandSuccess>> {
@@ -298,6 +340,14 @@ async function resolveNote(
   if (match) return readNote(tools, match.path)
   if (!found) return fail('not-found', '没有这篇')
   return fail('not-markdown', '这不是笔记')
+}
+
+async function readSource(tools: CommandTools, relativePath: string): Promise<BridgeResult<string>> {
+  const found = await findFile(tools, relativePath)
+  if (found === 'many') return fail('ambiguous', '有多篇同名')
+  if (!found) return { ok: true, value: '' }
+  if (!found.markdown) return fail('not-markdown', '这不是笔记')
+  return { ok: true, value: normalizeNewlines(await tools.notes.readMarkdown(tools.root, found.path)) }
 }
 
 async function readNote(

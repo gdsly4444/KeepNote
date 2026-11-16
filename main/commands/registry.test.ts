@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import type { Proposal } from '../../shared'
 import { parseMarkdown } from '../documents'
 import type { ListedFile } from '../vault'
 import { createCommandRegistry, systemClock, type CommandClock, type NoteStore, type RegisteredCommand } from './index'
@@ -350,6 +351,41 @@ describe('command registry', () => {
     expect(quiet.writes).toEqual([])
   })
 
+  it('writes an accepted diff and does not write when the diff is discarded or does not fit', async () => {
+    const notes = memoryNotes({ '决定.md': '选区里的句子\n' })
+    const proposal = {
+      id: 'd1',
+      path: '决定.md',
+      type: 'essay' as const,
+      groups: [{ id: 'g1', unit: 'paragraph' as const, before: '选区里的句子', after: '短句' }],
+      conversion: null
+    }
+    let current: Proposal | null = proposal
+    const registry = createCommandRegistry({
+      notes,
+      parse: parseMarkdown,
+      root: () => '/vault',
+      clock: frozenClock(),
+      proposals: {
+        pending: () => current,
+        accept() {
+          current = null
+        },
+        discard() {
+          current = null
+        }
+      }
+    })
+    expect(await registry.execute('apply-diff')).toMatchObject({ ok: true, value: { message: '接受了差异' } })
+    expect(notes.files.get('决定.md')).toBe('短句\n')
+    current = { ...proposal, groups: [], conversion: { to: 'essay', preview: '散文' } }
+    expect(await registry.execute('apply-diff')).toMatchObject({ ok: false, code: 'needs-conversion' })
+    current = proposal
+    expect(await registry.execute('discard-diff')).toMatchObject({ ok: true, value: { message: '已放弃' } })
+    expect(notes.files.get('决定.md')).toBe('短句\n')
+    expect(notes.writes).toEqual(['决定.md'])
+  })
+
   it('formats the system clock as a local day and minute', () => {
     const clock = systemClock()
     expect(clock.today()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -358,7 +394,7 @@ describe('command registry', () => {
 
   it('keeps the command module off the disk and the window', () => {
     const directory = dirname(fileURLToPath(import.meta.url))
-    const source = ['index.ts', 'registry.ts', 'text.ts', 'complete.ts']
+    const source = ['index.ts', 'registry.ts', 'text.ts', 'complete.ts', 'patch.ts']
       .map((name) => readFileSync(join(directory, name), 'utf8'))
       .join('\n')
     expect(source).not.toContain('node:fs')

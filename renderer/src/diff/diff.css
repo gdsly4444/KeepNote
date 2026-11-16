@@ -1,0 +1,45 @@
+.page-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selection-bar,
+.diff-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.diff-card,
+.diff-conversion {
+  margin: 0;
+  padding: 0.6em 0.8em;
+  background: var(--sidebar);
+  color: var(--ink);
+}
+
+.diff-path,
+.diff-old,
+.diff-new,
+.diff-conversion {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.diff-path {
+  color: var(--ink-muted);
+  font-size: var(--size-aux);
+}
+
+.diff-old {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+.diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

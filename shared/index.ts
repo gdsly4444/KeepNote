@@ -1,4 +1,6 @@
 export type {
+  AgentEntry,
+  AgentEvent,
   BridgeResult,
   ChangedNote,
   ChangedView,
@@ -7,11 +9,17 @@ export type {
   CommandSuccess,
   CompletionItem,
   DeskView,
+  DiffGroup,
+  DiffUnit,
   EventName,
   KeepNoteBridge,
+  Proposal,
   QueryArgs,
   QueryName,
-  QueryValue
+  QueryValue,
+  SessionTurn,
+  SessionView,
+  TypeConversion
 } from './bridge'
 export type {
   DocumentType,

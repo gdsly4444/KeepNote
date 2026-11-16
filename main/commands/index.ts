@@ -1,4 +1,5 @@
 export { completeLine } from './complete'
+export { applyGroups } from './patch'
 export { createCommandRegistry, systemClock, workPathFor } from './registry'
-export type { CommandClock, CommandRegistry, NoteLookup, NoteStore, RegisteredCommand } from './registry'
+export type { CommandClock, CommandRegistry, NoteLookup, NoteStore, OpenProposals, RegisteredCommand } from './registry'
 export { classifyChanged, outputTitles } from './text'

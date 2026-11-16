@@ -13,7 +13,8 @@ const commands: readonly { name: string; value: string }[] = [
   { name: 'leave', value: 'leave ' },
   { name: 'new', value: 'new ' },
   { name: 'open', value: 'open ' },
-  { name: 'accept', value: 'accept ' }
+  { name: 'accept', value: 'accept ' },
+  { name: 'ask', value: 'ask ' }
 ]
 
 const types = ['essay', 'journal', 'list', 'tech', 'work'] as const

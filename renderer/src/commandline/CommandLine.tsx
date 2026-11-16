@@ -48,6 +48,13 @@ export function CommandLine({
   async function submit(line: string): Promise<void> {
     const read = readCommandLine(line)
     if (!read) {
+      if (agentSpeech(line)) {
+        const result = await bridge.run('ask', currentPath ? { text: line.trim(), currentPath } : { text: line.trim() })
+        setEcho(result.ok ? (result.value?.message ?? '') : result.message)
+        if (result.ok) onChange('')
+        onResult('ask', result)
+        return
+      }
       if (line.trim()) setEcho('未知命令')
       return
     }
@@ -142,6 +149,11 @@ export function CommandLine({
       </div>
     </div>
   )
+}
+
+function agentSpeech(line: string): boolean {
+  const text = line.trim()
+  return text.length > 0 && /[^\u0000-\u007f]/.test(text)
 }
 
 function completionItems(value: QueryValue): CompletionItem[] {

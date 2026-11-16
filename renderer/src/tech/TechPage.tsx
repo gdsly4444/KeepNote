@@ -3,7 +3,8 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { useEffect, useRef, useState } from 'react'
-import type { KeepNoteBridge } from '../../../shared'
+import type { KeepNoteBridge, Proposal } from '../../../shared'
+import { ignore, ignoreApply, ignoreAsk, PageAgent } from '../diff'
 import { useNoteSave } from '../client'
 import './tech.css'
 import { copiedCode } from './code'
@@ -14,19 +15,28 @@ export function TechPage({
   body,
   bridge,
   scrollTo = null,
-  saveDelay = 400
+  saveDelay = 400,
+  proposal = null,
+  onApply,
+  onDiscard,
+  onAsk
 }: {
   path: string
   body: string
   bridge: KeepNoteBridge
   scrollTo?: { kind: 'heading' | 'code'; text: string; index: number; line: number; nonce: number } | null
   saveDelay?: number
+  proposal?: Proposal | null
+  onApply?: (groupId?: string) => void
+  onDiscard?: () => void
+  onAsk?: (text: string, selection: string) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const bodyRef = useRef(body)
   const [source, setSource] = useState(body)
   const [preview, setPreview] = useState(false)
+  const [picked, setPicked] = useState('')
   const save = useNoteSave(bridge, path, body, saveDelay)
   const saveRef = useRef(save)
   saveRef.current = save
@@ -99,7 +109,20 @@ export function TechPage({
   }, [scrollTo])
 
   return (
-    <article className="tech-page" data-mode="source" data-preview={preview ? 'true' : 'false'}>
+    <article
+      className="tech-page"
+      data-mode="source"
+      data-preview={preview ? 'true' : 'false'}
+      onMouseUp={() => setPicked(window.getSelection()?.toString() ?? '')}
+    >
+      <PageAgent
+        type="tech"
+        selection={picked}
+        proposal={proposal}
+        onApply={onApply ?? ignoreApply}
+        onDiscard={onDiscard ?? ignore}
+        onAsk={onAsk ?? ignoreAsk}
+      />
       <p className="tech-status">{save.status}</p>
       <button className="control tech-mode" type="button" onClick={() => setPreview((value) => !value)}>
         {preview ? '关闭预览' : '预览'}

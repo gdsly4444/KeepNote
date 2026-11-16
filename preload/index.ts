@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { CommandArgs, CommandName, EventName, KeepNoteBridge, QueryArgs, QueryName } from '../shared'
+import type { AgentEvent, CommandArgs, CommandName, EventName, KeepNoteBridge, QueryArgs, QueryName } from '../shared'
 
 const bridge: KeepNoteBridge = {
   run(command: CommandName, args?: CommandArgs) {
@@ -8,10 +8,10 @@ const bridge: KeepNoteBridge = {
   query(name: QueryName, args?: QueryArgs) {
     return ipcRenderer.invoke('keepnote:query', name, args)
   },
-  subscribe(event: EventName, listener: () => void): () => void {
+  subscribe(event: EventName, listener: (payload: AgentEvent | null) => void): () => void {
     const channel = `keepnote:event:${event}`
-    const wrapped = (_ipcEvent: IpcRendererEvent): void => {
-      listener()
+    const wrapped = (_ipcEvent: IpcRendererEvent, payload?: AgentEvent): void => {
+      listener(payload ?? null)
     }
     ipcRenderer.on(channel, wrapped)
     return () => {

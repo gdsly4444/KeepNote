@@ -1,5 +1,6 @@
 import { createElement, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import type { KeepNoteBridge } from '../../../shared'
+import type { KeepNoteBridge, Proposal } from '../../../shared'
+import { ignore, ignoreApply, ignoreAsk, PageAgent } from '../diff'
 import { useNoteSave } from '../client'
 import './list.css'
 import { parseList, serializeList, type ListNote, type ListRow } from './text'
@@ -9,13 +10,19 @@ export function ListPage({
   body,
   bridge,
   scrollTo = null,
-  saveDelay = 400
+  saveDelay = 400,
+  proposal = null,
+  onApply,
+  onDiscard
 }: {
   path: string
   body: string
   bridge: KeepNoteBridge
   scrollTo?: { text: string; index: number; nonce: number } | null
   saveDelay?: number
+  proposal?: Proposal | null
+  onApply?: (groupId?: string) => void
+  onDiscard?: () => void
 }) {
   const [note, setNote] = useState(() => parseList(body))
   const noteRef = useRef(note)
@@ -105,6 +112,14 @@ export function ListPage({
 
   return (
     <article className="list-page" ref={pageRef}>
+      <PageAgent
+        type="list"
+        selection=""
+        proposal={proposal}
+        onApply={onApply ?? ignoreApply}
+        onDiscard={onDiscard ?? ignore}
+        onAsk={ignoreAsk}
+      />
       <p className="list-status">{save.status}</p>
       <h1>
         <input

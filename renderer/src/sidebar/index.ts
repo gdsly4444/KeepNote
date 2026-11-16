@@ -1,3 +1,4 @@
+export { AgentSide } from './AgentSide'
 export { ContextSide } from './ContextSide'
 export { WorkContext } from './WorkContext'
 export { NavSide } from './NavSide'

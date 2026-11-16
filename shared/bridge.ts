@@ -12,12 +12,20 @@ export type CommandName =
   | 'leave'
   | 'log'
   | 'accept'
+  | 'ask'
+  | 'apply-diff'
+  | 'discard-diff'
+  | 'cancel-agent'
 
-export type QueryName = 'ping' | 'library' | 'desk' | 'complete' | 'changed'
+export type QueryName = 'ping' | 'library' | 'desk' | 'complete' | 'changed' | 'session'
 
-export type EventName = 'ready' | 'library-changed'
+export type EventName = 'ready' | 'library-changed' | 'agent'
 
 export type BridgeResult<T> = { ok: true; value: T } | { ok: false; code: string; message: string }
+
+export type AgentEntry = 'command' | 'sidebar' | 'selection'
+
+export type DiffUnit = 'section' | 'entry' | 'paragraph' | 'task' | 'lines'
 
 export interface CommandArgs {
   text?: string
@@ -25,6 +33,9 @@ export interface CommandArgs {
   title?: string
   path?: string
   currentPath?: string
+  selection?: string
+  groupId?: string
+  entry?: AgentEntry
 }
 
 export interface QueryArgs {
@@ -62,10 +73,52 @@ export interface ChangedView {
   accepted: ChangedNote[]
 }
 
-export type QueryValue = LibraryStatus | DeskView | CompletionItem[] | ChangedView | null
+export interface DiffGroup {
+  id: string
+  unit: DiffUnit
+  before: string
+  after: string
+}
+
+export interface TypeConversion {
+  to: DocumentType
+  preview: string
+}
+
+export interface Proposal {
+  id: string
+  path: string
+  type: DocumentType
+  groups: DiffGroup[]
+  conversion: TypeConversion | null
+}
+
+export interface SessionTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+export interface SessionView {
+  turns: SessionTurn[]
+  reads: string[]
+  proposal: Proposal | null
+  kept: Proposal[]
+  running: boolean
+  message: string
+}
+
+export interface AgentEvent {
+  kind: 'text' | 'read' | 'diff' | 'status'
+  text: string
+  path: string
+  proposal: Proposal | null
+  state: '' | 'running' | 'done' | 'cancelled' | 'failed'
+}
+
+export type QueryValue = LibraryStatus | DeskView | CompletionItem[] | ChangedView | SessionView | null
 
 export interface KeepNoteBridge {
   run(command: CommandName, args?: CommandArgs): Promise<BridgeResult<CommandSuccess | null>>
   query(name: QueryName, args?: QueryArgs): Promise<BridgeResult<QueryValue>>
-  subscribe(event: EventName, listener: () => void): () => void
+  subscribe(event: EventName, listener: (payload: AgentEvent | null) => void): () => void
 }

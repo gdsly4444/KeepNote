@@ -66,6 +66,39 @@
   font-size: var(--size-aux);
 }
 
+.agent-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.agent-side input {
+  min-width: 0;
+  margin: 0;
+  padding: 0.35em 0.5em;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--size-aux);
+}
+
+.agent-side input:focus {
+  outline: none;
+}
+
+.agent-side input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.agent-message {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--size-aux);
+}
+
 .context-label {
   margin: 0;
   color: var(--ink-muted);

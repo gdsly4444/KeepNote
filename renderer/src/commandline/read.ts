@@ -1,6 +1,6 @@
 import type { CommandArgs, CommandName, DocumentType } from '../../../shared'
 
-const names = ['today', 'diary', 'log', 'now', 'leave', 'new', 'open', 'accept'] as const
+const names = ['today', 'diary', 'log', 'now', 'leave', 'new', 'open', 'accept', 'ask'] as const
 
 type LineCommand = (typeof names)[number]
 
@@ -12,7 +12,7 @@ export function readCommandLine(input: string): { command: CommandName; args: Co
   const rest = gap === -1 ? '' : trimmed.slice(gap + 1).trim()
   if (!isCommand(name)) return null
   if (name === 'today') return rest ? null : { command: 'today', args: {} }
-  if (name === 'diary' || name === 'log' || name === 'now' || name === 'leave') {
+  if (name === 'diary' || name === 'log' || name === 'now' || name === 'leave' || name === 'ask') {
     return { command: name, args: rest ? { text: rest } : {} }
   }
   if (name === 'open' || name === 'accept') return rest ? { command: name, args: { path: rest } } : { command: name, args: {} }
